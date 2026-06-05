@@ -20,3 +20,10 @@ export {
   useAssetMetadata,
   useReplies,
 } from './useWeb3';
+
+export {
+  useCreateRoundOnChain,
+  useSubmitProposalOnChain,
+  useCastVoteOnChain,
+  useClaimAward,
+} from './useOnChain';
