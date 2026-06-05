@@ -1,247 +1,178 @@
 'use client';
 
-import { useState, useReducer } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import InputFormGroup from '@/components/ui/InputFormGroup';
-import Button from '@/components/ui/Button';
-import Card from '@/components/ui/Card';
-import Divider from '@/components/ui/Divider';
-import ConnectToContinue from '@/components/web3/ConnectToContinue';
-import { post } from '@/lib/api-client';
 import Link from 'next/link';
-
-interface WizardState {
-  type: 'TIMED' | 'INFINITE';
-  title: string;
-  description: string;
-  fundingAmount: string;
-  currencyType: string;
-  numWinners: string;
-  startTime: string;
-  proposalEndTime: string;
-  votingEndTime: string;
-  quorumFor: string;
-  quorumAgainst: string;
-  votingPeriod: string;
-}
-
-type Action = { type: 'SET'; field: keyof WizardState; value: string };
-
-const initialState: WizardState = {
-  type: 'TIMED',
-  title: '',
-  description: '',
-  fundingAmount: '',
-  currencyType: 'ETH',
-  numWinners: '1',
-  startTime: '',
-  proposalEndTime: '',
-  votingEndTime: '',
-  quorumFor: '',
-  quorumAgainst: '',
-  votingPeriod: '7',
-};
-
-function reducer(state: WizardState, action: Action): WizardState {
-  return { ...state, [action.field]: action.value };
-}
-
-const STEPS = ['Type', 'Details', 'Schedule', 'Review'];
+import { useRouter } from 'next/navigation';
+import { useAccount } from 'wagmi';
+import { useState } from 'react';
+import { post } from '@/lib/api-client';
+import Card from '@/components/ui/Card';
+import ConnectToContinue from '@/components/web3/ConnectToContinue';
+import StepSidebar from '@/components/round-wizard/StepSidebar';
+import WizardFooter from '@/components/round-wizard/WizardFooter';
+import HouseStep from '@/components/round-wizard/steps/HouseStep';
+import RoundInfoStep from '@/components/round-wizard/steps/RoundInfoStep';
+import VotersStep from '@/components/round-wizard/steps/VotersStep';
+import AwardsStep from '@/components/round-wizard/steps/AwardsStep';
+import DatesStep from '@/components/round-wizard/steps/DatesStep';
+import ReviewStep from '@/components/round-wizard/steps/ReviewStep';
+import { useWizardState, type HouseInfo } from '@/lib/hooks/useWizardState';
 
 export default function CreateRoundPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const houseId = parseInt(searchParams.get('houseId') ?? '1', 10) || 1;
-  const [step, setStep] = useState(0);
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const { address } = useAccount();
+  const {
+    activeStep,
+    stepDisabled,
+    round,
+    setStep,
+    nextStep,
+    prevStep,
+    updateRound,
+  } = useWizardState();
 
-  function set(field: keyof WizardState) {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      dispatch({ type: 'SET', field, value: e.target.value });
+  const [isCreating, setIsCreating] = useState(false);
+
+  function handleSelectHouse(house: HouseInfo) {
+    updateRound({ house });
   }
 
-  function validateStep(): boolean {
-    const errs: Record<string, string> = {};
-    if (step === 1) {
-      if (!state.title.trim()) errs.title = 'Required';
-      if (!state.fundingAmount || Number(state.fundingAmount) <= 0) errs.fundingAmount = 'Required';
-      if (!state.numWinners || Number(state.numWinners) < 1) errs.numWinners = 'Required';
-    }
-    if (step === 2 && state.type === 'TIMED') {
-      if (!state.startTime) errs.startTime = 'Required';
-      if (!state.proposalEndTime) errs.proposalEndTime = 'Required';
-      if (!state.votingEndTime) errs.votingEndTime = 'Required';
-    }
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
+  function handleCreate() {
+    setIsCreating(true);
+    post('/api/rounds', {
+      type: round.roundType,
+      title: round.title,
+      description: round.description || null,
+      fundingAmount: round.awards[0]?.allocated ?? 0,
+      currencyType: round.awards[0]?.type === 'ETH' ? 'ETH' : (round.awards[0]?.symbol ?? 'ETH'),
+      numWinners: round.numWinners,
+      startTime: new Date(round.proposalPeriodStartUnixTimestamp * 1000).toISOString(),
+      proposalEndTime: round.proposalPeriodDurationSecs > 0
+        ? new Date((round.proposalPeriodStartUnixTimestamp + round.proposalPeriodDurationSecs) * 1000).toISOString()
+        : null,
+      votingEndTime: round.votePeriodDurationSecs > 0
+        ? new Date((round.proposalPeriodStartUnixTimestamp + round.proposalPeriodDurationSecs + round.votePeriodDurationSecs) * 1000).toISOString()
+        : null,
+      houseId: round.house.id,
+      propStrategy: { type: 'custom', voters: round.voters },
+      voteStrategy: { type: 'custom', voters: round.voters },
+      quorumFor: round.quorumFor,
+      quorumAgainst: round.quorumAgainst,
+      votingPeriod: round.votingPeriod,
+    })
+      .then((data: any) => {
+        router.push(`/rounds/${data.id}`);
+      })
+      .catch((err) => {
+        alert(err.message ?? 'Failed to create round');
+      })
+      .finally(() => {
+        setIsCreating(false);
+      });
   }
 
-  async function handleSubmit() {
-    setLoading(true);
-    setError('');
-    try {
-      const body: any = {
-        type: state.type,
-        title: state.title,
-        description: state.description || null,
-        fundingAmount: Number(state.fundingAmount),
-        currencyType: state.currencyType || null,
-        numWinners: Number(state.numWinners),
-        startTime: new Date(state.startTime).toISOString(),
-        houseId: houseId,
-        propStrategy: { type: 'all' },
-        voteStrategy: { type: 'all' },
-      };
-
-      if (state.type === 'TIMED') {
-        body.proposalEndTime = new Date(state.proposalEndTime).toISOString();
-        body.votingEndTime = new Date(state.votingEndTime).toISOString();
-      } else {
-        body.quorumFor = Number(state.quorumFor) || null;
-        body.quorumAgainst = Number(state.quorumAgainst) || null;
-        body.votingPeriod = Number(state.votingPeriod) || 7;
-      }
-
-      await post('/api/rounds', body);
-      router.push('/app');
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to create round');
-    } finally {
-      setLoading(false);
+  function renderStep() {
+    switch (activeStep) {
+      case 1:
+        return <HouseStep onSelectHouse={handleSelectHouse} />;
+      case 2:
+        return (
+          <RoundInfoStep
+            title={round.title}
+            description={round.description}
+            onUpdate={(p) => updateRound(p)}
+          />
+        );
+      case 3:
+        return (
+          <VotersStep
+            voters={round.voters}
+            onUpdate={(p) => updateRound(p)}
+          />
+        );
+      case 4:
+        return (
+          <AwardsStep
+            awards={round.awards.length ? round.awards : [{ type: 'ETH', address: '', total: 0, allocated: 0, state: 'input' }]}
+            onUpdate={(p) => updateRound(p)}
+          />
+        );
+      case 5:
+        return (
+          <DatesStep
+            roundType={round.roundType}
+            proposalPeriodStartUnixTimestamp={round.proposalPeriodStartUnixTimestamp}
+            proposalPeriodDurationSecs={round.proposalPeriodDurationSecs}
+            votePeriodDurationSecs={round.votePeriodDurationSecs}
+            quorumFor={round.quorumFor}
+            quorumAgainst={round.quorumAgainst}
+            votingPeriod={round.votingPeriod}
+            onUpdate={(p) => updateRound(p)}
+          />
+        );
+      case 6:
+        return (
+          <ReviewStep
+            round={round}
+            onUpdate={updateRound}
+            onCreate={handleCreate}
+            isCreating={isCreating}
+          />
+        );
+      default:
+        return null;
     }
   }
+
+  const showSidebarTitle = activeStep > 1 && round.house.name;
 
   return (
     <ConnectToContinue>
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <Link
-        href="/app"
-        className="inline-flex items-center text-sm font-medium text-brand-gray hover:text-brand-black mb-6"
-      >
-        &larr; Browse rounds
-      </Link>
+      <div className="container mx-auto px-4 py-8">
+        <Link
+          href="/app"
+          className="inline-flex items-center text-sm font-medium text-brand-gray hover:text-brand-black mb-6 transition-colors"
+        >
+          &larr; Browse rounds
+        </Link>
 
-      <h1 className="font-londrina text-3xl text-brand-black mb-2">Create Round</h1>
-      <p className="text-brand-gray mb-8">Step {step + 1} of {STEPS.length}: {STEPS[step]}</p>
+        <div className="flex gap-8 lg:flex-row flex-col">
+          <aside className="hidden lg:block w-64 flex-shrink-0">
+            {showSidebarTitle && (
+              <div className="flex items-center gap-3 mb-6">
+                {round.house.image ? (
+                  <img src={round.house.image} alt={round.house.name} className="w-10 h-10 rounded-full object-cover" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-brand-purple-hint flex items-center justify-center text-brand-purple font-londrina text-lg">
+                    {round.house.name.charAt(0)}
+                  </div>
+                )}
+                <p className="font-bold text-sm text-brand-black truncate">{round.house.name}</p>
+              </div>
+            )}
+            <StepSidebar
+              activeStep={activeStep}
+              onStepClick={(step) => setStep(step)}
+            />
+          </aside>
 
-      {/* Step indicators */}
-      <div className="flex gap-2 mb-8">
-        {STEPS.map((label, i) => (
-          <div
-            key={i}
-            className={`flex-1 h-1.5 rounded-full transition-colors ${i <= step ? 'bg-brand-purple' : 'bg-border-light'}`}
-          />
-        ))}
+          <main className="flex-1 min-w-0">
+            <Card className="p-6">
+              {renderStep()}
+            </Card>
+
+            {activeStep !== 6 && (
+              <WizardFooter
+                activeStep={activeStep}
+                stepDisabled={stepDisabled}
+                onBack={prevStep}
+                onNext={nextStep}
+                onCreate={handleCreate}
+                isCreating={isCreating}
+              />
+            )}
+          </main>
+        </div>
       </div>
-
-      {error && (
-        <div className="bg-brand-red-hint border border-brand-red-semi-transparent rounded-xl px-4 py-3 text-sm font-medium text-brand-red mb-6">
-          {error}
-        </div>
-      )}
-
-      {/* Step 0: Type */}
-      {step === 0 && (
-        <div className="grid gap-4">
-          <Card
-            onClick={() => dispatch({ type: 'SET', field: 'type', value: 'TIMED' })}
-            className={`p-5 border-2 ${state.type === 'TIMED' ? 'border-brand-purple bg-brand-purple-hint' : 'border-transparent'}`}
-          >
-            <h3 className="font-bold text-lg text-brand-black mb-1">Timed Round</h3>
-            <p className="text-sm text-brand-gray">
-              Fixed proposal and voting windows. Winners chosen at the end.
-            </p>
-          </Card>
-          <Card
-            onClick={() => dispatch({ type: 'SET', field: 'type', value: 'INFINITE' })}
-            className={`p-5 border-2 ${state.type === 'INFINITE' ? 'border-brand-purple bg-brand-purple-hint' : 'border-transparent'}`}
-          >
-            <h3 className="font-bold text-lg text-brand-black mb-1">Continuous Round</h3>
-            <p className="text-sm text-brand-gray">
-              Proposals accepted continuously. Each proposal gets its own voting period.
-            </p>
-          </Card>
-        </div>
-      )}
-
-      {/* Step 1: Details */}
-      {step === 1 && (
-        <div className="flex flex-col gap-4">
-          <InputFormGroup label="Title" name="title" value={state.title} onChange={set('title')} placeholder="Round title" error={errors.title} required />
-          <InputFormGroup label="Description" name="description" value={state.description} onChange={set('description')} placeholder="Describe the round" textarea rows={3} />
-          <div className="grid grid-cols-2 gap-4">
-            <InputFormGroup label="Funding per Winner" name="fundingAmount" type="number" value={state.fundingAmount} onChange={set('fundingAmount')} placeholder="5" error={errors.fundingAmount} required />
-            <InputFormGroup label="Currency" name="currencyType" value={state.currencyType} onChange={set('currencyType')} placeholder="ETH" />
-          </div>
-          <InputFormGroup label="Number of Winners" name="numWinners" type="number" value={state.numWinners} onChange={set('numWinners')} placeholder="1" error={errors.numWinners} required />
-        </div>
-      )}
-
-      {/* Step 2: Schedule */}
-      {step === 2 && state.type === 'TIMED' && (
-        <div className="flex flex-col gap-4">
-          <InputFormGroup label="Start Time" name="startTime" type="datetime-local" value={state.startTime} onChange={set('startTime')} error={errors.startTime} required />
-          <InputFormGroup label="Proposal Deadline" name="proposalEndTime" type="datetime-local" value={state.proposalEndTime} onChange={set('proposalEndTime')} error={errors.proposalEndTime} required />
-          <InputFormGroup label="Voting End Time" name="votingEndTime" type="datetime-local" value={state.votingEndTime} onChange={set('votingEndTime')} error={errors.votingEndTime} required />
-        </div>
-      )}
-      {step === 2 && state.type === 'INFINITE' && (
-        <div className="flex flex-col gap-4">
-          <InputFormGroup label="Start Time" name="startTime" type="datetime-local" value={state.startTime} onChange={set('startTime')} required />
-          <div className="grid grid-cols-2 gap-4">
-            <InputFormGroup label="Quorum For" name="quorumFor" type="number" value={state.quorumFor} onChange={set('quorumFor')} placeholder="10" />
-            <InputFormGroup label="Quorum Against" name="quorumAgainst" type="number" value={state.quorumAgainst} onChange={set('quorumAgainst')} placeholder="5" />
-          </div>
-          <InputFormGroup label="Voting Period (days)" name="votingPeriod" type="number" value={state.votingPeriod} onChange={set('votingPeriod')} placeholder="7" />
-        </div>
-      )}
-
-      {/* Step 3: Review */}
-      {step === 3 && (
-        <Card className="p-5 flex flex-col gap-3">
-          <div><span className="text-sm text-brand-gray">Type:</span> <span className="font-bold">{state.type === 'TIMED' ? 'Timed Round' : 'Continuous Round'}</span></div>
-          <Divider />
-          <div><span className="text-sm text-brand-gray">Title:</span> <span className="font-bold">{state.title}</span></div>
-          {state.description && <div><span className="text-sm text-brand-gray">Description:</span> {state.description}</div>}
-          <Divider />
-          <div><span className="text-sm text-brand-gray">Funding:</span> <span className="font-bold">{state.fundingAmount} {state.currencyType}</span></div>
-          <div><span className="text-sm text-brand-gray">Winners:</span> <span className="font-bold">{state.numWinners}</span></div>
-          <Divider />
-          {state.type === 'TIMED' ? (
-            <>
-              <div><span className="text-sm text-brand-gray">Start:</span> {state.startTime}</div>
-              <div><span className="text-sm text-brand-gray">Proposals close:</span> {state.proposalEndTime}</div>
-              <div><span className="text-sm text-brand-gray">Voting ends:</span> {state.votingEndTime}</div>
-            </>
-          ) : (
-            <>
-              <div><span className="text-sm text-brand-gray">Start:</span> {state.startTime}</div>
-              <div><span className="text-sm text-brand-gray">Quorum:</span> {state.quorumFor || '—'} for / {state.quorumAgainst || '—'} against</div>
-              <div><span className="text-sm text-brand-gray">Voting period:</span> {state.votingPeriod} days</div>
-            </>
-          )}
-        </Card>
-      )}
-
-      {/* Navigation */}
-      <div className="flex justify-between mt-8">
-        <Button variant="ghost" onClick={() => setStep(step - 1)} disabled={step === 0}>
-          Back
-        </Button>
-        {step < 3 ? (
-          <Button onClick={() => { if (validateStep()) setStep(step + 1); }}>
-            Next
-          </Button>
-        ) : (
-          <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Creating...' : 'Create Round'}
-          </Button>
-        )}
-      </div>
-    </div>
     </ConnectToContinue>
   );
 }
