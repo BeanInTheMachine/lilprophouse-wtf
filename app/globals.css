@@ -552,7 +552,7 @@
   max-height: 65vh;
   height: 65vh;
   object-fit: cover;
-  object-position: left center;
+  object-position: right center;
   width: auto;
   max-width: 55vw;
   z-index: 1;
