@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useAccount, useSignTypedData } from 'wagmi';
 import { useState } from 'react';
 import { post } from '@/lib/api-client';
+import { DOMAIN_SEPARATOR, PROPOSAL_MESSAGE_TYPES } from '@/lib/eip712';
 import Card from '@/components/ui/Card';
 import ConnectToContinue from '@/components/web3/ConnectToContinue';
 import StepSidebar from '@/components/round-wizard/StepSidebar';
@@ -31,43 +32,79 @@ export default function CreateRoundPage() {
   } = useWizardState();
 
   const [isCreating, setIsCreating] = useState(false);
+  const { signTypedDataAsync } = useSignTypedData();
 
   function handleSelectHouse(house: HouseInfo) {
     updateRound({ house });
   }
 
-  function handleCreate() {
+  async function handleCreate() {
+    if (!address) return;
     setIsCreating(true);
-    post('/api/rounds', {
-      type: round.roundType,
+
+    const payload = {
       title: round.title,
-      description: round.description || null,
-      fundingAmount: round.awards[0]?.allocated ?? 0,
-      currencyType: round.awards[0]?.type === 'ETH' ? 'ETH' : (round.awards[0]?.symbol ?? 'ETH'),
-      numWinners: round.numWinners,
-      startTime: new Date(round.proposalPeriodStartUnixTimestamp * 1000).toISOString(),
-      proposalEndTime: round.proposalPeriodDurationSecs > 0
-        ? new Date((round.proposalPeriodStartUnixTimestamp + round.proposalPeriodDurationSecs) * 1000).toISOString()
-        : null,
-      votingEndTime: round.votePeriodDurationSecs > 0
-        ? new Date((round.proposalPeriodStartUnixTimestamp + round.proposalPeriodDurationSecs + round.votePeriodDurationSecs) * 1000).toISOString()
-        : null,
-      houseId: round.house.id,
-      propStrategy: { type: 'custom', voters: round.voters },
-      voteStrategy: { type: 'custom', voters: round.voters },
-      quorumFor: round.quorumFor,
-      quorumAgainst: round.quorumAgainst,
-      votingPeriod: round.votingPeriod,
-    })
-      .then((data: any) => {
-        router.push(`/rounds/${data.id}`);
-      })
-      .catch((err) => {
-        alert(err.message ?? 'Failed to create round');
-      })
-      .finally(() => {
-        setIsCreating(false);
+      what: round.description || '',
+      tldr: `${round.roundType} round · ${round.numWinners} winner${round.numWinners !== 1 ? 's' : ''} · ${round.awards[0]?.allocated ?? 0} ${round.awards[0]?.type === 'ETH' ? 'ETH' : (round.awards[0]?.symbol ?? '')}`,
+      parentAuctionId: BigInt(round.house.id),
+      parentType: 'auction',
+    };
+
+    try {
+      const signature = await signTypedDataAsync({
+        domain: DOMAIN_SEPARATOR,
+        types: PROPOSAL_MESSAGE_TYPES,
+        primaryType: 'Proposal',
+        message: payload,
       });
+
+      const signedMessageString = JSON.stringify(payload);
+      const signedData = {
+        message: Buffer.from(signedMessageString).toString('base64'),
+        signature,
+        signer: address,
+      };
+
+      await post('/api/rounds', {
+        type: round.roundType,
+        title: round.title,
+        description: round.description || null,
+        fundingAmount: round.awards[0]?.allocated ?? 0,
+        currencyType: round.awards[0]?.type === 'ETH' ? 'ETH' : (round.awards[0]?.symbol ?? 'ETH'),
+        numWinners: round.numWinners,
+        startTime: new Date(round.proposalPeriodStartUnixTimestamp * 1000).toISOString(),
+        proposalEndTime: round.proposalPeriodDurationSecs > 0
+          ? new Date((round.proposalPeriodStartUnixTimestamp + round.proposalPeriodDurationSecs) * 1000).toISOString()
+          : null,
+        votingEndTime: round.votePeriodDurationSecs > 0
+          ? new Date((round.proposalPeriodStartUnixTimestamp + round.proposalPeriodDurationSecs + round.votePeriodDurationSecs) * 1000).toISOString()
+          : null,
+        houseId: round.house.id,
+        propStrategy: { type: 'custom', voters: round.voters },
+        voteStrategy: { type: 'custom', voters: round.voters },
+        quorumFor: round.quorumFor,
+        quorumAgainst: round.quorumAgainst,
+        votingPeriod: round.votingPeriod,
+        address,
+        signedData,
+        messageTypes: PROPOSAL_MESSAGE_TYPES,
+        domainSeparator: DOMAIN_SEPARATOR,
+      })
+        .then((data: any) => {
+          router.push(`/rounds/${data.id}`);
+        })
+        .catch((err) => {
+          alert(err.message ?? 'Failed to create round');
+        });
+    } catch (err: any) {
+      if (err.message?.includes('rejected') || err.message?.includes('denied')) {
+        // user rejected signature — silently return
+      } else {
+        alert(err.message ?? 'Failed to sign');
+      }
+    } finally {
+      setIsCreating(false);
+    }
   }
 
   function renderStep() {
