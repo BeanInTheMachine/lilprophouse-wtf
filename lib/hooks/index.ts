@@ -22,8 +22,15 @@ export {
 } from './useWeb3';
 
 export {
-  useCreateRoundOnChain,
-  useSubmitProposalOnChain,
-  useCastVoteOnChain,
+  useHousesOnChain,
+  useRoundsOnChain,
+  useHouseMetadata,
+  useRoundChainState,
+  useCreateHouseOnChain,
+  useCreateTimedRoundOnChain,
+  useCancelRound,
+  useFinalizeRound,
   useClaimAward,
+  useHasCreatorPass,
+  useIssueCreatorPass,
 } from './useOnChain';
