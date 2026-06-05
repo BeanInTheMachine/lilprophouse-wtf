@@ -6,6 +6,7 @@ import InputFormGroup from '@/components/ui/InputFormGroup';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Divider from '@/components/ui/Divider';
+import ConnectToContinue from '@/components/web3/ConnectToContinue';
 import { post } from '@/lib/api-client';
 import Link from 'next/link';
 
@@ -114,6 +115,7 @@ export default function CreateRoundPage() {
   }
 
   return (
+    <ConnectToContinue>
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <Link
         href="/app"
@@ -240,5 +242,6 @@ export default function CreateRoundPage() {
         )}
       </div>
     </div>
+    </ConnectToContinue>
   );
 }

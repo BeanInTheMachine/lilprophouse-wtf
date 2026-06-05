@@ -1,4 +1,11 @@
+'use client';
+
+import { useAccount } from 'wagmi';
+import Link from 'next/link';
+
 export default function Home() {
+  const { isConnected } = useAccount();
+
   return (
     <div>
       {/* Hero Section */}
@@ -11,10 +18,16 @@ export default function Home() {
                 A simple and fun way to award people onchain. Set up a round, tell the internet and watch magic happen.
               </p>
               <div className="flex gap-3 mt-4">
-                <a href="/create/round" className="inline-flex items-center justify-center rounded-[10px] px-3 py-1.5 text-base font-bold text-brand-black bg-white border border-border-med hover:text-brand-gray transition-colors no-underline">
+                <a
+                  href={isConnected ? '/create/round' : '/dashboard'}
+                  className="inline-flex items-center justify-center rounded-[10px] px-3 py-1.5 text-base font-bold text-brand-black bg-white border border-border-med hover:text-brand-gray transition-colors no-underline"
+                >
                   Create a round
                 </a>
-                <a href="/app" className="inline-flex items-center justify-center rounded-[10px] px-3 py-1.5 text-base font-bold text-white bg-brand-pink hover:bg-brand-pink-semi-transparent transition-colors no-underline">
+                <a
+                  href="/app"
+                  className="inline-flex items-center justify-center rounded-[10px] px-3 py-1.5 text-base font-bold text-white bg-brand-pink hover:bg-brand-pink-semi-transparent transition-colors no-underline"
+                >
                   View rounds
                 </a>
               </div>
@@ -29,6 +42,7 @@ export default function Home() {
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 128 1440 192" className="w-full block" style={{ backgroundColor: '#dbd3fd' }}>
           <path fillOpacity=".1" fill="#8a2be2" d="M0,160L80,176C160,192,320,224,480,218.7C640,213,800,171,960,154.7C1120,139,1280,149,1360,154.7L1440,160L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z" />
         </svg>
+
         <div className="container mx-auto px-4 py-8">
           <div className="homeStatsFlex">
             {[
@@ -44,6 +58,7 @@ export default function Home() {
             ))}
           </div>
         </div>
+
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 230" className="w-full bg-white block">
           <path fillOpacity="1" fill="#8a2be2" d="M0,96L80,112C160,128,320,160,480,154.7C640,149,800,107,960,112C1120,117,1280,171,1360,197.3L1440,224L1440,0L1360,0C1280,0,1120,0,960,0C800,0,640,0,480,0C320,0,160,0,80,0L0,0Z" />
         </svg>
