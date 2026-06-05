@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useState } from 'react';
 import { isAddress } from 'viem';
 import Button from '@/components/ui/Button';
 import InputFormGroup from '@/components/ui/InputFormGroup';
@@ -30,21 +30,8 @@ export default function AwardsStep({ awards, onUpdate }: AwardsStepProps) {
   }
 
   function updateAward(idx: number, patch: Partial<EditableAsset>) {
-    const updated = awards.map((a, i) => (i === idx ? { ...a, ...patch, state: 'input' as const } : a));
+    const updated = awards.map((a, i) => (i === idx ? { ...a, ...patch } : a));
     onUpdate({ awards: updated, numWinners });
-  }
-
-  function saveAward(idx: number) {
-    const a = awards[idx];
-    if (a.type !== 'ETH' && !isAddress(a.address)) {
-      updateAward(idx, { state: 'error', error: 'Invalid address' });
-      return;
-    }
-    if (a.allocated <= 0) {
-      updateAward(idx, { state: 'error', error: 'Enter an amount' });
-      return;
-    }
-    updateAward(idx, { state: 'saved', error: undefined });
   }
 
   function removeAward(idx: number) {
@@ -91,7 +78,6 @@ export default function AwardsStep({ awards, onUpdate }: AwardsStepProps) {
             award={award}
             totalAwards={awards.length}
             onChange={(patch) => updateAward(idx, patch)}
-            onSave={() => saveAward(idx)}
             onRemove={() => removeAward(idx)}
           />
         ))}
@@ -105,15 +91,30 @@ interface AwardSlotProps {
   award: EditableAsset;
   totalAwards: number;
   onChange: (patch: Partial<EditableAsset>) => void;
-  onSave: () => void;
   onRemove: () => void;
 }
 
-function AwardSlot({ index, award, totalAwards, onChange, onSave, onRemove }: AwardSlotProps) {
+function AwardSlot({ index, award, totalAwards, onChange, onRemove }: AwardSlotProps) {
+  const [amountStr, setAmountStr] = useState(award.allocated ? String(award.allocated) : '');
+  const [tokenAddress, setTokenAddress] = useState(award.address);
+
   const { name: tokenName, symbol } = useAssetMetadata(
-    award.type !== 'ETH' && isAddress(award.address) ? award.address : undefined,
+    award.type !== 'ETH' && isAddress(tokenAddress) ? tokenAddress : undefined,
     award.type === 'ERC721' ? 'ERC721' : 'ERC20',
   );
+
+  function handleSave() {
+    if (award.type !== 'ETH' && !isAddress(tokenAddress)) {
+      onChange({ state: 'error', error: 'Invalid address' });
+      return;
+    }
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount <= 0) {
+      onChange({ state: 'error', error: 'Enter a valid amount' });
+      return;
+    }
+    onChange({ state: 'saved', error: undefined, address: tokenAddress, allocated: amount });
+  }
 
   return (
     <Card className={`p-4 mb-3 ${award.state === 'saved' ? 'border-brand-green bg-brand-green-hint' : ''}`}>
@@ -140,7 +141,7 @@ function AwardSlot({ index, award, totalAwards, onChange, onSave, onRemove }: Aw
           {symbol && <span className="text-brand-gray">{symbol}</span>}
           {tokenName && <span className="text-brand-gray text-xs">({tokenName})</span>}
           <button
-            onClick={() => onChange({ state: 'input' })}
+            onClick={() => { onChange({ state: 'input' }); setAmountStr(String(award.allocated || '')); setTokenAddress(award.address); }}
             className="ml-auto text-xs text-brand-purple font-bold hover:underline"
           >
             Edit
@@ -165,8 +166,8 @@ function AwardSlot({ index, award, totalAwards, onChange, onSave, onRemove }: Aw
             <InputFormGroup
               label="Token address"
               name={`address-${index}`}
-              value={award.address}
-              onChange={(e) => onChange({ address: e.target.value })}
+              value={tokenAddress}
+              onChange={(e) => { setTokenAddress(e.target.value); onChange({ address: e.target.value }); }}
               placeholder="0x..."
             />
           )}
@@ -176,12 +177,12 @@ function AwardSlot({ index, award, totalAwards, onChange, onSave, onRemove }: Aw
           <InputFormGroup
             label={award.type === 'ERC721' ? 'Token ID' : 'Amount'}
             name={`amount-${index}`}
-            value={award.allocated ? String(award.allocated) : ''}
-            onChange={(e) => onChange({ allocated: Number(e.target.value) || 0 })}
+            value={amountStr}
+            onChange={(e) => setAmountStr(e.target.value)}
             placeholder={award.type === 'ERC721' ? '1' : '0.00'}
           />
 
-          <Button variant="primary" className="bg-brand-purple hover:bg-brand-purple-transparent border-0 text-sm" onClick={onSave}>
+          <Button variant="primary" className="bg-brand-purple hover:bg-brand-purple-transparent border-0 text-sm" onClick={handleSave}>
             Save award
           </Button>
         </div>
