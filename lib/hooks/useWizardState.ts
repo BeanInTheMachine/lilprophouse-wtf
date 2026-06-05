@@ -169,7 +169,6 @@ function wizardReducer(state: RoundWizardState, action: WizardAction): RoundWiza
       const houseJustSelected =
         action.payload.house &&
         action.payload.house.address !== '' &&
-        action.payload.house.existingHouse &&
         state.activeStep === 1 &&
         !stepDisabled[0];
 
