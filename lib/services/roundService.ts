@@ -30,7 +30,7 @@ export async function getActiveRounds() {
   return prisma.round.findMany({
     where: {
       visible: true,
-      state: 'ACCEPTING_PROPOSALS',
+      state: { in: ['ACCEPTING_PROPOSALS', 'VOTING'] },
     },
     include: {
       proposals: {
@@ -40,5 +40,22 @@ export async function getActiveRounds() {
       house: true,
     },
     orderBy: { createdAt: 'desc' },
+  });
+}
+
+export async function getCompletedRounds() {
+  return prisma.round.findMany({
+    where: {
+      visible: true,
+      state: { in: ['COMPLETED', 'CANCELLED'] },
+    },
+    include: {
+      proposals: {
+        where: { deletedAt: null },
+        include: { votes: true },
+      },
+      house: true,
+    },
+    orderBy: { updatedAt: 'desc' },
   });
 }
