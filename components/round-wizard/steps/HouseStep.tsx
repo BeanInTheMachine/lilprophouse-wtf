@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useAccount } from 'wagmi';
 import { useHouses } from '@/lib/hooks/useApi';
+import { useHousesOnChain, useHouseMetadata } from '@/lib/hooks/useOnChain';
 import Card from '@/components/ui/Card';
 import InputFormGroup from '@/components/ui/InputFormGroup';
 import Button from '@/components/ui/Button';
@@ -10,16 +11,31 @@ import LoadingIndicator from '@/components/ui/LoadingIndicator';
 import Image from 'next/image';
 import type { HouseInfo } from '@/lib/hooks/useWizardState';
 import { post } from '@/lib/api-client';
+import { isAddress } from 'viem';
 
 interface HouseStepProps {
   onSelectHouse: (house: HouseInfo) => void;
 }
 
+interface MergedHouse {
+  id: number;
+  address: string;
+  name: string;
+  image: string;
+  description: string;
+  contractURI: string;
+  existingHouse: boolean;
+  roundCount: number;
+  source: 'db' | 'chain' | 'both';
+  loading?: boolean;
+}
+
 export default function HouseStep({ onSelectHouse }: HouseStepProps) {
   const { address, isConnected } = useAccount();
-  const { data: houses, loading, error } = useHouses();
-  const [showNewHouseForm, setShowNewHouseForm] = useState(false);
+  const { data: dbHouses, loading: dbLoading, error: dbError } = useHouses();
+  const { houses: chainAddresses, loading: chainLoading } = useHousesOnChain();
 
+  const [showNewHouseForm, setShowNewHouseForm] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newImage, setNewImage] = useState('');
@@ -35,8 +51,58 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
     );
   }
 
-  const myHouses = houses?.filter((h: any) => h.contractAddress === address?.toLowerCase()) ?? [];
-  const hasHouse = myHouses.length > 0;
+  const loading = dbLoading || chainLoading;
+
+  // Merge DB houses + on-chain houses, deduplicating by contract address
+  const mergedHouses = useMemo(() => {
+    const map = new Map<string, MergedHouse>();
+
+    // Add DB houses first
+    for (const h of dbHouses ?? []) {
+      if (!h.contractAddress || !isAddress(h.contractAddress)) continue;
+      const key = h.contractAddress.toLowerCase();
+      map.set(key, {
+        id: h.id,
+        address: h.contractAddress,
+        name: h.name,
+        image: h.profileImageUrl ?? '',
+        description: h.description ?? '',
+        contractURI: '',
+        existingHouse: true,
+        roundCount: h.rounds?.length ?? 0,
+        source: 'db',
+      });
+    }
+
+    // Add on-chain houses, merging with existing DB entries
+    for (const addr of chainAddresses ?? []) {
+      if (!addr || !isAddress(addr)) continue;
+      const key = addr.toLowerCase();
+      const existing = map.get(key);
+
+      if (existing) {
+        existing.source = 'both';
+      } else {
+        // On-chain house without DB record — show with loading metadata
+        map.set(key, {
+          id: 0,
+          address: addr,
+          name: '(Loading...)',
+          image: '',
+          description: '',
+          contractURI: '',
+          existingHouse: true,
+          roundCount: 0,
+          source: 'chain',
+          loading: true,
+        });
+      }
+    }
+
+    return Array.from(map.values());
+  }, [dbHouses, chainAddresses]);
+
+  const hasHouse = mergedHouses.length > 0;
 
   if (showNewHouseForm) {
     return (
@@ -46,36 +112,11 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
           <p className="text-sm text-brand-gray">Think of a house as your profile page where you host rounds.</p>
         </div>
 
-        <InputFormGroup
-          label="House name"
-          name="name"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="My Community"
-          required
-        />
+        <InputFormGroup label="House name" name="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="My Community" required />
+        <InputFormGroup label="Description" name="description" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="What is your community about?" textarea rows={3} />
+        <InputFormGroup label="Profile image URL" name="image" value={newImage} onChange={(e) => setNewImage(e.target.value)} placeholder="https://example.com/logo.png" />
 
-        <InputFormGroup
-          label="Description"
-          name="description"
-          value={newDescription}
-          onChange={(e) => setNewDescription(e.target.value)}
-          placeholder="What is your community about?"
-          textarea
-          rows={3}
-        />
-
-        <InputFormGroup
-          label="Profile image URL"
-          name="image"
-          value={newImage}
-          onChange={(e) => setNewImage(e.target.value)}
-          placeholder="https://example.com/logo.png"
-        />
-
-        {createError && (
-          <p className="text-sm text-brand-red">{createError}</p>
-        )}
+        {createError && <p className="text-sm text-brand-red">{createError}</p>}
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => setShowNewHouseForm(false)}>Back</Button>
@@ -124,72 +165,101 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
 
       {loading && <LoadingIndicator />}
 
-      {error && (
+      {dbError && (
         <div className="text-center py-8">
           <p className="text-brand-gray mb-4">Failed to load houses.</p>
           <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
         </div>
       )}
 
-      {!loading && !error && myHouses.length > 0 && (
+      {!loading && !dbError && mergedHouses.length > 0 && (
         <div className="grid gap-3">
-          {myHouses.map((house: any) => (
-            <Card
-              key={house.id}
-              onClick={() =>
-                onSelectHouse({
-                  id: house.id,
-                  address: house.contractAddress,
-                  name: house.name,
-                  image: house.profileImageUrl,
-                  description: house.description ?? '',
-                  contractURI: '',
-                  existingHouse: true,
-                })
-              }
-              className="p-4 flex items-center gap-4 cursor-pointer hover:border-brand-purple transition-colors"
-            >
-              <div className="relative w-12 h-12 rounded-full overflow-hidden bg-border-light flex-shrink-0">
-                {house.profileImageUrl ? (
-                  <Image src={house.profileImageUrl} alt={house.name} fill className="object-cover" sizes="48px" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-brand-purple font-londrina text-lg">
-                    {house.name.charAt(0)}
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm text-brand-black truncate">
-                  {house.name} &middot; {house.rounds?.length ?? 0} round{(house.rounds?.length ?? 0) !== 1 ? 's' : ''}
-                </p>
-                {house.description && (
-                  <p className="text-xs text-brand-gray line-clamp-2 mt-0.5">{house.description}</p>
-                )}
-              </div>
-              <span className="text-brand-gray text-lg flex-shrink-0">&rarr;</span>
-            </Card>
+          {mergedHouses.map((house) => (
+            <MergedHouseCard
+              key={house.address}
+              house={house}
+              onSelect={onSelectHouse}
+            />
           ))}
         </div>
       )}
 
-      {!loading && !error && myHouses.length === 0 && (
+      {!loading && !dbError && mergedHouses.length === 0 && (
         <p className="text-sm text-brand-gray py-4">You don&apos;t own any houses yet. Create one below to get started.</p>
       )}
 
       {!hasHouse && (
         <div className="border-t border-border-light pt-4">
-        <Card
-          onClick={() => setShowNewHouseForm(true)}
-          className="p-4 flex items-center gap-4 cursor-pointer hover:border-brand-purple transition-colors"
-        >
-          <div className="w-12 h-12 rounded-full overflow-hidden bg-brand-purple-hint flex-shrink-0 flex items-center justify-center">
-            <span className="text-brand-purple text-xl font-bold">+</span>
-          </div>
-          <p className="font-bold text-sm text-brand-black">Create a new house</p>
-          <span className="text-brand-gray text-lg flex-shrink-0 ml-auto">&rarr;</span>
-        </Card>
-      </div>
+          <Card onClick={() => setShowNewHouseForm(true)} className="p-4 flex items-center gap-4 cursor-pointer hover:border-brand-purple transition-colors">
+            <div className="w-12 h-12 rounded-full overflow-hidden bg-brand-purple-hint flex-shrink-0 flex items-center justify-center">
+              <span className="text-brand-purple text-xl font-bold">+</span>
+            </div>
+            <p className="font-bold text-sm text-brand-black">Create a new house</p>
+            <span className="text-brand-gray text-lg flex-shrink-0 ml-auto">&rarr;</span>
+          </Card>
+        </div>
       )}
     </div>
+  );
+}
+
+function MergedHouseCard({ house, onSelect }: { house: MergedHouse; onSelect: (h: HouseInfo) => void }) {
+  const { name: chainName, description: chainDesc, loading: metaLoading } = useHouseMetadata(
+    house.source !== 'db' ? house.address : undefined,
+  );
+
+  const name = house.name === '(Loading...)' ? (chainName ?? house.name) : house.name;
+  const description = chainDesc ?? house.description;
+  const isLoading = house.loading && metaLoading;
+
+  return (
+    <Card
+      onClick={() =>
+        onSelect({
+          id: house.id,
+          address: house.address,
+          name: name,
+          image: house.image,
+          description: description,
+          contractURI: house.contractURI,
+          existingHouse: true,
+        })
+      }
+      className="p-4 flex items-center gap-4 cursor-pointer hover:border-brand-purple transition-colors"
+    >
+      <div className="relative w-12 h-12 rounded-full overflow-hidden bg-border-light flex-shrink-0">
+        {house.image ? (
+          <Image src={house.image} alt={name} fill className="object-cover" sizes="48px" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-brand-purple font-londrina text-lg">
+            {name.charAt(0)}
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="font-bold text-sm text-brand-black truncate">
+            {isLoading ? 'Loading...' : name}
+          </p>
+          {house.source === 'chain' && (
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-brand-purple-hint text-brand-purple font-medium flex-shrink-0">
+              On-chain
+            </span>
+          )}
+          {house.source === 'both' && (
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-brand-green-hint text-brand-green font-medium flex-shrink-0">
+              On-chain
+            </span>
+          )}
+        </div>
+        <p className="font-bold text-sm text-brand-black truncate">
+          {house.roundCount} round{house.roundCount !== 1 ? 's' : ''}
+        </p>
+        {description && (
+          <p className="text-xs text-brand-gray line-clamp-2 mt-0.5">{description}</p>
+        )}
+      </div>
+      <span className="text-brand-gray text-lg flex-shrink-0">&rarr;</span>
+    </Card>
   );
 }
