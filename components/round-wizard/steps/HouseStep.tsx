@@ -11,7 +11,7 @@ import LoadingIndicator from '@/components/ui/LoadingIndicator';
 import Image from 'next/image';
 import type { HouseInfo } from '@/lib/hooks/useWizardState';
 import { post } from '@/lib/api-client';
-import { isAddress, decodeEventLog, type Log } from 'viem';
+import { isAddress, type Log } from 'viem';
 
 interface HouseStepProps {
   onSelectHouse: (house: HouseInfo) => void;
@@ -55,25 +55,17 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
       if (!receipt || !txHash || !address || houseAddress) return;
 
       try {
-        const houseCreatedEvent = receipt.logs.find((log: Log) =>
-          log.topics[0]?.toLowerCase() === '0x1f5335a1b520cd23d72b28e6b2c6c35875db987a43d4eda7cac05a0f7efcf3c1'
-        );
-
         let deployedAddress: string | null = null;
 
-        if (houseCreatedEvent) {
-          try {
-            const decoded = decodeEventLog({
-              abi: [{ type: 'event', name: 'HouseCreated', inputs: [
-                { name: 'house', type: 'address', indexed: true },
-                { name: 'creator', type: 'address', indexed: true },
-              ]}],
-              data: houseCreatedEvent.data,
-              topics: houseCreatedEvent.topics,
-            });
-            deployedAddress = (decoded.args as any).house as string;
-          } catch {}
-        }
+        try {
+          const houseCreatedEvent = receipt.logs.find((log: Log) =>
+            log.topics[0]?.toLowerCase() === '0x1d86eade4c08dbf1a2a16629fa356b37de61e10ea3b06970fac880bdc2f6da34'
+          );
+
+          if (houseCreatedEvent && houseCreatedEvent.topics[2]) {
+            deployedAddress = `0x${houseCreatedEvent.topics[2].slice(26)}` as string;
+          }
+        } catch {}
 
         if (!deployedAddress) {
           deployedAddress = address;

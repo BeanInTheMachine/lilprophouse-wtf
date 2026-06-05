@@ -1,7 +1,7 @@
 'use client';
 
 import { useAccount, useWriteContract, useReadContract } from 'wagmi';
-import { type Address, parseAbi } from 'viem';
+import { type Address, parseAbi, encodeAbiParameters } from 'viem';
 import { useState } from 'react';
 import { post } from '@/lib/api-client';
 import {
@@ -126,11 +126,16 @@ export function useCreateHouseOnChain() {
   async function createHouse(name: string, description: string, imageURI: string) {
     setError(null);
     try {
+      const config = encodeAbiParameters(
+        [{ type: 'string' }, { type: 'string' }, { type: 'string' }],
+        [name, description, imageURI],
+      );
+
       const tx = await writeContractAsync({
         address: PROP_HOUSE_ADDRESS,
         abi: PROP_HOUSE_ABI,
         functionName: 'createHouse',
-        args: [COMMUNITY_HOUSE_IMPL, name, description, imageURI],
+        args: [{ impl: COMMUNITY_HOUSE_IMPL, config }],
       });
       return tx;
     } catch (e: any) {
@@ -160,18 +165,29 @@ export function useCreateTimedRoundOnChain() {
   ) {
     setError(null);
     try {
-      const roundInfo = {
-        title,
-        description,
-        impl: TIMED_ROUND_IMPL,
-        config: '0x',
-      };
+      const roundConfig = encodeAbiParameters(
+        [
+          { type: 'uint256' },
+          { type: 'uint256' },
+          { type: 'uint256' },
+          { type: 'uint256' },
+        ],
+        [BigInt(proposalPeriodStartTimestamp), BigInt(proposalPeriodDurationSecs), BigInt(votePeriodDurationSecs), BigInt(numWinners)],
+      );
 
       const tx = await writeContractAsync({
         address: PROP_HOUSE_ADDRESS,
         abi: PROP_HOUSE_ABI,
         functionName: 'createRoundOnExistingHouse',
-        args: [houseAddress, roundInfo],
+        args: [
+          houseAddress as Address,
+          {
+            impl: TIMED_ROUND_IMPL,
+            config: roundConfig,
+            title,
+            description,
+          },
+        ],
       });
       return tx;
     } catch (e: any) {
