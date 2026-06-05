@@ -57,17 +57,16 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
       try {
         let deployedAddress: string | null = null;
 
-        try {
-          const houseCreatedEvent = receipt.logs.find((log: Log) =>
-            log.topics[0]?.toLowerCase() === '0x1d86eade4c08dbf1a2a16629fa356b37de61e10ea3b06970fac880bdc2f6da34'
-          );
+        const houseCreatedEvent = receipt.logs.find((log: Log) =>
+          log.topics[0]?.toLowerCase() === '0xc3480ff86b71d5d5b239f776a04bca0fb7a8a2c9bd1e65a58f5a23f3e1162733'
+        );
 
-          if (houseCreatedEvent && houseCreatedEvent.topics[2]) {
-            deployedAddress = `0x${houseCreatedEvent.topics[2].slice(26)}` as string;
-          }
-        } catch {}
+        if (houseCreatedEvent && houseCreatedEvent.topics[2]) {
+          deployedAddress = `0x${houseCreatedEvent.topics[2].slice(26)}` as string;
+        }
 
         if (!deployedAddress) {
+          console.warn('HouseCreated event not found in receipt, using wallet address');
           deployedAddress = address;
         }
 
