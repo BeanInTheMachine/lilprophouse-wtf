@@ -3,7 +3,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
 import { RainbowKitProvider, lightTheme } from '@rainbow-me/rainbowkit';
-import { PropHouseProvider } from '@prophouse/sdk-react';
 import { AnalyticsProvider } from '@/lib/analytics';
 import { config } from '@/lib/wagmi';
 import '@rainbow-me/rainbowkit/styles.css';
@@ -20,9 +19,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             accentColor: '#8a2be2',
           })}
         >
-          <PropHouseProvider>
-            <AnalyticsProvider>{children}</AnalyticsProvider>
-          </PropHouseProvider>
+          <AnalyticsProvider>{children}</AnalyticsProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
