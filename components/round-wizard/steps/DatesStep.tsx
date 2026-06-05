@@ -1,0 +1,158 @@
+'use client';
+
+import InputFormGroup from '@/components/ui/InputFormGroup';
+import Card from '@/components/ui/Card';
+import dayjs from 'dayjs';
+
+interface DatesStepProps {
+  roundType: 'TIMED' | 'INFINITE';
+  proposalPeriodStartUnixTimestamp: number;
+  proposalPeriodDurationSecs: number;
+  votePeriodDurationSecs: number;
+  quorumFor: number | null;
+  quorumAgainst: number | null;
+  votingPeriod: number | null;
+  onUpdate: (payload: {
+    roundType?: 'TIMED' | 'INFINITE';
+    proposalPeriodStartUnixTimestamp?: number;
+    proposalPeriodDurationSecs?: number;
+    votePeriodDurationSecs?: number;
+    quorumFor?: number | null;
+    quorumAgainst?: number | null;
+    votingPeriod?: number | null;
+  }) => void;
+}
+
+export default function DatesStep(props: DatesStepProps) {
+  const { roundType, proposalPeriodStartUnixTimestamp, proposalPeriodDurationSecs, votePeriodDurationSecs, quorumFor, quorumAgainst, votingPeriod, onUpdate } = props;
+
+  const startDate = proposalPeriodStartUnixTimestamp
+    ? dayjs.unix(proposalPeriodStartUnixTimestamp).format('YYYY-MM-DDTHH:mm')
+    : '';
+
+  const proposalDays = proposalPeriodDurationSecs / 86400;
+  const voteDays = votePeriodDurationSecs / 86400;
+
+  const proposalEnd = proposalPeriodStartUnixTimestamp + proposalPeriodDurationSecs;
+  const votingEnd = proposalEnd + votePeriodDurationSecs;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h2 className="font-bold text-xl text-brand-black mb-1">Round timing</h2>
+        <p className="text-sm text-brand-gray">Set how long the round should run.</p>
+      </div>
+
+      {/* Round type */}
+      <div>
+        <label className="text-sm font-bold text-brand-black mb-2 block">Round type</label>
+        <div className="flex gap-4">
+          {(['TIMED', 'INFINITE'] as const).map((type) => (
+            <button
+              key={type}
+              onClick={() => onUpdate({ roundType: type })}
+              className={`flex-1 p-4 rounded-xl border-2 text-left transition-colors ${
+                roundType === type
+                  ? 'border-brand-purple bg-brand-purple-hint'
+                  : 'border-border-light hover:border-border-med'
+              }`}
+            >
+              <p className="font-bold text-sm text-brand-black">{type === 'TIMED' ? 'Timed Round' : 'Continuous Round'}</p>
+              <p className="text-xs text-brand-gray mt-0.5">
+                {type === 'TIMED'
+                  ? 'Fixed proposal and voting windows. Winners chosen at the end.'
+                  : 'Proposals accepted continuously. Each gets its own voting period.'}
+              </p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Start date */}
+      <InputFormGroup
+        label="Start date"
+        name="startDate"
+        type="datetime-local"
+        value={startDate}
+        onChange={(e) => {
+          const ts = e.target.value ? dayjs(e.target.value).unix() : 0;
+          onUpdate({ proposalPeriodStartUnixTimestamp: ts });
+        }}
+        required
+      />
+
+      {roundType === 'TIMED' ? (
+        <>
+          <div className="grid grid-cols-2 gap-4">
+            <InputFormGroup
+              label="Proposal period (days)"
+              name="proposalDays"
+              type="number"
+              value={proposalDays ? String(proposalDays) : ''}
+              onChange={(e) => onUpdate({ proposalPeriodDurationSecs: (Number(e.target.value) || 0) * 86400 })}
+              placeholder="7"
+            />
+            <InputFormGroup
+              label="Vote period (days)"
+              name="voteDays"
+              type="number"
+              value={voteDays ? String(voteDays) : ''}
+              onChange={(e) => onUpdate({ votePeriodDurationSecs: (Number(e.target.value) || 0) * 86400 })}
+              placeholder="3"
+            />
+          </div>
+
+          {proposalPeriodStartUnixTimestamp > 0 && proposalPeriodDurationSecs > 0 && (
+            <Card className="p-4 bg-surface-dark">
+              <div className="grid grid-cols-3 gap-4 text-center text-sm">
+                <div>
+                  <p className="text-brand-gray text-xs font-bold uppercase tracking-wider">Proposals open</p>
+                  <p className="font-bold text-brand-black">{dayjs.unix(proposalPeriodStartUnixTimestamp).format('MMM D, YYYY h:mm A')}</p>
+                </div>
+                <div>
+                  <p className="text-brand-gray text-xs font-bold uppercase tracking-wider">Proposals close</p>
+                  <p className="font-bold text-brand-black">{dayjs.unix(proposalEnd).format('MMM D, YYYY h:mm A')}</p>
+                </div>
+                {votePeriodDurationSecs > 0 && (
+                  <div>
+                    <p className="text-brand-gray text-xs font-bold uppercase tracking-wider">Voting ends</p>
+                    <p className="font-bold text-brand-black">{dayjs.unix(votingEnd).format('MMM D, YYYY h:mm A')}</p>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-4">
+            <InputFormGroup
+              label="Quorum for"
+              name="quorumFor"
+              type="number"
+              value={quorumFor ? String(quorumFor) : ''}
+              onChange={(e) => onUpdate({ quorumFor: Number(e.target.value) || null })}
+              placeholder="10"
+            />
+            <InputFormGroup
+              label="Quorum against"
+              name="quorumAgainst"
+              type="number"
+              value={quorumAgainst ? String(quorumAgainst) : ''}
+              onChange={(e) => onUpdate({ quorumAgainst: Number(e.target.value) || null })}
+              placeholder="5"
+            />
+          </div>
+          <InputFormGroup
+            label="Voting period (days per proposal)"
+            name="votingPeriod"
+            type="number"
+            value={votingPeriod ? String(votingPeriod) : ''}
+            onChange={(e) => onUpdate({ votingPeriod: Number(e.target.value) || null })}
+            placeholder="7"
+          />
+        </>
+      )}
+    </div>
+  );
+}
