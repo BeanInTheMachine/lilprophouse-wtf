@@ -103,7 +103,8 @@
   body {
     @apply bg-white text-brand-black antialiased;
     letter-spacing: -0.2px;
-    background-color: rgb(250, 250, 250);
+    background-color: #ffffff;
+    overflow-x: hidden;
   }
 
   h1,
@@ -532,4 +533,157 @@
       max-width: none !important;
     }
   }
+}
+
+/* ============================================
+   Homepage — Exact Legacy Positioning
+   ============================================ */
+
+.homeStatsContainer {
+  margin-top: -20vh;
+}
+
+.homeHeaderImg {
+  position: absolute;
+  right: 0;
+  padding-right: 0;
+  max-height: 100%;
+  height: 70vh;
+  object-fit: cover;
+  width: auto;
+  z-index: 999;
+  pointer-events: none;
+}
+
+.homeCityImg {
+  position: relative;
+  left: 4rem;
+  width: 75vw;
+  margin-top: 0;
+  z-index: 2;
+}
+
+.homeCityTitleCol {
+  position: relative;
+  bottom: -6rem;
+}
+
+.homeStatsFlex {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 70px;
+}
+
+.homeStatItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.homeStatNumber {
+  font-size: 50px;
+  font-weight: bold;
+}
+
+.homeStatLabel {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.homeFeaturesGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  padding-bottom: 2rem;
+}
+
+.homeFeatureItem {
+  display: flex;
+  flex-direction: column;
+  min-height: 10rem;
+}
+
+.homeFeatureItem b {
+  font-size: 18px;
+}
+
+.homeFeatureItem span {
+  font-size: 16px;
+  text-align: left;
+}
+
+.homeHandMoonContainer {
+  position: relative;
+}
+
+.homeHandMoonContainer img {
+  position: absolute;
+  width: 25vw;
+  z-index: 999;
+}
+
+.homeHand {
+  left: 0;
+  margin-top: -10vh;
+}
+
+.homeMoon {
+  right: 0;
+  margin-top: -10vh;
+}
+
+@media (min-width: 1200px) and (max-width: 1600px) {
+  .homeStatsContainer { margin-top: -25vh; }
+  .homeHeaderImg { height: 60vh; }
+  .homeHand { margin-top: -7vh; }
+  .homeMoon { margin-top: -7vh; }
+}
+
+@media (min-width: 992px) and (max-width: 1200px) {
+  .homeStatsContainer { margin-top: -30vh; }
+  .homeHeaderImg { height: 55vh; }
+  .homeHand { margin-top: -4vh; }
+  .homeMoon { margin-top: -4vh; }
+}
+
+@media (max-width: 992px) {
+  .homeFeaturesGrid {
+    grid-template-columns: 1fr;
+  }
+  .homeFeatureItem {
+    min-height: auto;
+    align-items: flex-start;
+  }
+  .homeStatNumber { font-size: 40px; }
+  .homeStatLabel { font-size: 20px; }
+  .homeStatsFlex { gap: 50px; }
+}
+
+@media (max-width: 768px) {
+  .homeCityTitleCol {
+    position: static;
+    bottom: auto;
+    padding: 1rem 0;
+    text-align: center;
+  }
+  .homeCityImg {
+    position: static;
+    left: auto;
+    width: 100vw;
+  }
+  .homeStatNumber { font-size: 32px; }
+  .homeStatLabel { font-size: 18px; }
+  .homeStatsFlex { gap: 40px; }
+  .homeHandMoonContainer img { width: 40vw; }
+}
+
+@media (max-width: 576px) {
+  .homeHeaderImg { height: 35vh; margin-top: -17vh; }
+  .homeStatsContainer { margin-top: 3vh; }
+  .homeStatNumber { font-size: 20px; }
+  .homeStatLabel { font-size: 12px; }
+  .homeStatsFlex { gap: 20px; }
+  .homeHand { margin-top: -5vh; }
+  .homeMoon { margin-top: -5vh; }
+  .homeFeaturesGrid { grid-template-columns: 1fr; }
 }
