@@ -2,7 +2,8 @@
 
 import { useAccount, useBalance, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
 import { type Address, parseAbi } from 'viem';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { get, post } from '@/lib/api-client';
 
 const ERC20_ABI = parseAbi([
   'function name() view returns (string)',
@@ -120,19 +121,58 @@ export function useAssetMetadata(tokenAddress?: string, tokenType: 'ERC20' | 'ER
 }
 
 /**
- * Fetch and submit replies for a proposal.
- * Placeholder — will be wired to Supabase in Phase 8.
+ * Fetch and submit replies for a proposal via Supabase.
  */
 export function useReplies(proposalId?: number) {
   const { address } = useAccount();
+  const [replies, setReplies] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  return {
-    replies: [] as any[],
-    loading: false,
-    error: null,
-    submitReply: async (_content: string) => {
-      console.warn('Replies not yet wired — coming in Phase 8');
+  useEffect(() => {
+    if (!proposalId) return;
+
+    let cancelled = false;
+
+    async function fetch() {
+      setLoading(true);
+      try {
+        const data = await get<any[]>(`/api/replies?proposalId=${proposalId}`);
+        if (!cancelled) {
+          setReplies(data);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) setError((err as Error).message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [proposalId]);
+
+  const submitReply = useCallback(
+    async (content: string, communityAddress: string, blockTag: number = 0) => {
+      if (!address || !proposalId) throw new Error('Wallet not connected');
+
+      const newReply = await post<any>('/api/replies', {
+        content,
+        address,
+        proposalId,
+        communityAddress,
+        blockTag,
+      });
+
+      setReplies((prev) => [...prev, newReply]);
+      return newReply;
     },
-    address,
-  };
+    [address, proposalId],
+  );
+
+  return { replies, loading, error, submitReply, address };
 }
