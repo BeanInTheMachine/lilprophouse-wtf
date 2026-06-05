@@ -17,7 +17,7 @@ dist/
 .env.production.local
 
 # prisma
-prisma/migrations/
+# Migration files are committed for CI/CD deploys
 
 # debug
 npm-debug.log*
