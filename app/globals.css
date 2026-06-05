@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   PT Root UI — Primary typeface (legacy match)
+   ============================================ */
+
 @font-face {
   font-family: 'PT Root UI';
   src: url('/fonts/PT-Root-UI_Regular.woff2') format('woff2');
@@ -30,10 +34,76 @@
   font-style: normal;
 }
 
+/* ============================================
+   Design Tokens — Full legacy CSS custom property parity
+   ============================================ */
+
 @layer base {
+  :root {
+    /* Pink */
+    --brand-pink: #e02ecf;
+    --brand-pink-transparent: rgba(224, 46, 207, 0.6);
+    --brand-pink-semi-transparent: rgba(224, 46, 207, 0.25);
+    --brand-pink-hint: rgba(224, 46, 207, 0.08);
+
+    /* Purple */
+    --brand-purple: #8a2be2;
+    --brand-purple-transparent: rgba(138, 43, 226, 0.6);
+    --brand-purple-semi-transparent: rgba(138, 43, 226, 0.25);
+    --brand-purple-hint: rgba(138, 43, 226, 0.08);
+
+    /* Yellow */
+    --brand-yellow: #cba727;
+    --brand-yellow-transparent: rgba(203, 167, 39, 0.78);
+    --brand-yellow-semi-transparent: rgba(203, 167, 39, 0.3);
+    --brand-yellow-hint: rgba(203, 167, 39, 0.1);
+
+    /* Green */
+    --brand-green: #50ba9a;
+    --brand-green-transparent: rgba(80, 186, 154, 0.78);
+    --brand-green-semi-transparent: rgba(80, 186, 154, 0.3);
+    --brand-green-hint: rgba(80, 186, 154, 0.1);
+
+    /* Black */
+    --brand-black: #14161b;
+    --brand-black-transparent: rgba(20, 22, 27, 0.6);
+    --brand-black-semi-transparent: rgba(20, 22, 27, 0.25);
+
+    /* Red */
+    --brand-red: #e02e2e;
+    --brand-red-transparent: rgba(224, 46, 46, 0.6);
+    --brand-red-semi-transparent: rgba(224, 46, 46, 0.25);
+    --brand-red-hint: rgba(224, 46, 46, 0.1);
+
+    /* Gray */
+    --brand-gray: #666666;
+    --brand-gray-transparent: rgba(102, 102, 102, 0.6);
+    --brand-gray-semi-transparent: rgba(102, 102, 102, 0.25);
+    --brand-gray-hint: rgba(102, 102, 102, 0.1);
+
+    /* Surfaces */
+    --bg-light: #fff;
+    --bg-med: #fcfcfc;
+    --bg-dark: #f5f5f5;
+
+    /* Borders */
+    --border-light: rgba(0, 0, 0, 0.04);
+    --border-med: rgba(0, 0, 0, 0.1);
+    --border-dark: rgba(102, 102, 102, 0.25);
+
+    /* Shadows */
+    --shadow-none: 0px 0px 0px rgba(0, 0, 0, 0);
+    --shadow-low: 0px 4px 12px rgba(0, 0, 0, 0.03);
+    --shadow-high: 0px 2px 8px rgba(0, 0, 0, 0.08);
+
+    /* Transitions */
+    --card-transition: 0.15s cubic-bezier(0, 0.41, 0.6, 1.02);
+  }
+
   body {
     @apply bg-white text-brand-black antialiased;
     letter-spacing: -0.2px;
+    background-color: rgb(250, 250, 250);
   }
 
   h1,
@@ -43,15 +113,52 @@
   h5 {
     @apply font-bold;
   }
+
+  p {
+    margin-bottom: 0 !important;
+  }
+
+  * {
+    font-family: 'PT Root UI', system-ui, sans-serif;
+  }
+
+  .tooltip-inner {
+    min-width: min-content;
+  }
 }
 
+/* ============================================
+   Layout & Background Utilities
+   ============================================ */
+
 @layer utilities {
+  .wrapper {
+    @apply flex flex-col min-h-screen max-w-screen;
+  }
+
   .break-out {
     width: 100vw;
     position: relative;
     left: calc(-1 * (100vw - 100%) / 2);
   }
 
+  .bgLightPurple {
+    background-color: #dbd3fd;
+  }
+
+  .bgPurple {
+    background-color: #8a2be2;
+  }
+
+  .bgGray {
+    background-color: #f5f5f5;
+  }
+
+  .bgWhite {
+    background-color: #ffffff;
+  }
+
+  /* Homepage gradient — multilayered radial + linear */
   .homeGradientBg {
     background:
       url('/small-pink-pattern@2x.png'),
@@ -83,6 +190,7 @@
       );
   }
 
+  /* General page gradient — subtler than homepage */
   .gradientBg {
     background:
       linear-gradient(180deg, rgba(245, 245, 245, 0) 78.1%, #f5f5f5 100%),
@@ -107,37 +215,321 @@
         rgba(224, 46, 207, 0) 100%
       );
   }
+}
+
+/* ============================================
+   Dropdown Component — Legacy phDropdown parity
+   ============================================ */
+
+@layer components {
+  .phDropdown .dropdown button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0px 1rem;
+  }
+
+  .phDropdown .dropdown button,
+  .phDropdown .show > .btn-success.dropdown-toggle {
+    background: transparent;
+    width: 100%;
+    height: 38px;
+    font-weight: 600;
+    color: var(--brand-black);
+    border-radius: 10px;
+    border: 1px solid var(--border-med);
+  }
+
+  .phDropdown .show {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.06);
+    border-radius: 12px;
+  }
+
+  .phDropdown .dropdown .dropdown-menu.show {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.06);
+    border-radius: 12px;
+    padding: 2px;
+    width: 100%;
+  }
+
+  .phDropdown .dropdown-item {
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    padding: 0px 10px;
+    height: 38px;
+    align-items: center;
+  }
+
+  .phDropdown .dropdown-item:active,
+  .phDropdown .dropdown-item:focus,
+  .phDropdown .dropdown-item:hover {
+    background: var(--border-light);
+    border-radius: 10px;
+  }
+
+  .btn-success:hover,
+  .btn-success:focus,
+  .btn-success:focus-visible {
+    color: var(--brand-black) !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: var(--bg-med);
+    border: 1px solid rgba(102, 102, 102, 0.6);
+  }
+}
+
+/* ============================================
+   Proposal Content Typography — Legacy proposalCopy parity
+   ============================================ */
+
+@layer components {
+  .proposalContent {
+    word-break: break-word;
+    padding: 0 !important;
+  }
 
   .proposalContent h1 {
-    @apply font-bold text-xl tracking-wider;
+    font-family: 'PT Root UI' !important;
+    font-style: normal !important;
+    font-weight: 700 !important;
+    font-size: 20px !important;
+    line-height: 25px !important;
+    letter-spacing: 0.02em !important;
   }
 
   .proposalContent h2 {
-    @apply font-bold text-sm tracking-wider mt-4 text-brand-black;
+    font-family: 'PT Root UI' !important;
+    font-style: normal !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+    line-height: 19px !important;
+    margin-top: 15px !important;
+    letter-spacing: 0.02em !important;
+    color: var(--brand-black) !important;
   }
 
   .proposalContent img {
-    @apply max-w-full;
+    max-width: 100% !important;
   }
 
   .proposalContent p,
   .proposalContent li {
-    @apply font-normal text-base leading-5 tracking-wider mb-0;
+    font-family: 'PT Root UI' !important;
+    font-style: normal !important;
+    font-weight: 400 !important;
+    font-size: 16px !important;
+    line-height: 21px !important;
+    letter-spacing: 0.02em !important;
+    margin-bottom: 0 !important;
   }
 
   .proposalContent blockquote {
-    @apply text-brand-black font-normal text-base leading-5 tracking-wider m-0 ml-5 mb-2.5 border-l-4 pl-4;
-    border-left-color: rgba(102, 102, 102, 0.25);
+    font-family: 'PT Root UI';
+    color: var(--brand-black) !important;
+    font-style: normal !important;
+    font-weight: 400 !important;
+    font-size: 16px !important;
+    line-height: 21px !important;
+    letter-spacing: 0.02em !important;
+    margin: 0 !important;
+    margin-left: 20px !important;
+    margin-bottom: 10px !important;
+    border-left-color: rgba(102, 102, 102, 0.25) !important;
+    border-left-width: 4px !important;
+    border-left-style: solid !important;
+    padding-left: 16px !important;
   }
 
   .proposalContent a {
-    @apply text-brand-purple underline hover:underline;
+    color: var(--brand-purple) !important;
+    text-decoration: underline !important;
+  }
+
+  .proposalContent a:hover {
+    text-decoration: underline !important;
   }
 
   .proposalContent code,
   .proposalContent pre {
-    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
-    @apply text-sm text-white p-5 whitespace-pre-wrap;
-    background: #2f3136;
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace !important;
+    font-size: 13px !important;
+    background: #2f3136 !important;
+    color: white !important;
+    padding: 22px !important;
+    white-space: pre-wrap;
+  }
+
+  .proposalContent ul {
+    margin-bottom: 0 !important;
+  }
+}
+
+/* ============================================
+   Voting Progress Bar
+   ============================================ */
+
+@layer components {
+  .bg-success {
+    background: var(--brand-purple) !important;
+    border-radius: 6px 2px 2px 6px;
+  }
+
+  .bg-warning {
+    background: var(--brand-purple-transparent) !important;
+  }
+
+  .roundAllotmentBar .bg-warning {
+    border-radius: 2px 6px 6px 2px !important;
+    margin-left: 2px;
+  }
+}
+
+/* ============================================
+   Modal Styles
+   ============================================ */
+
+@layer components {
+  .ReactModal__Overlay--after-open {
+    backdrop-filter: blur(5px) !important;
+    z-index: 3;
+  }
+
+  .ReactModal__Content {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    max-height: max-content !important;
+  }
+
+  .proposalModalContainer {
+    max-height: 100% !important;
+    overflow-y: scroll !important;
+    overflow-y: overlay !important;
+  }
+
+  .proposalModalContainer .container {
+    min-width: 100%;
+  }
+}
+
+/* ============================================
+   Tooltip Styles
+   ============================================ */
+
+@layer components {
+  .tooltip.show {
+    opacity: 1;
+    white-space: pre;
+  }
+
+  .tooltip.bs-tooltip-top .tooltip-arrow::before {
+    border-top-color: var(--brand-gray);
+  }
+
+  .tooltip.bs-tooltip-bottom .tooltip-arrow::before {
+    border-bottom-color: var(--brand-gray);
+  }
+
+  .tooltip.bs-tooltip-start .tooltip-arrow::before {
+    border-left-color: var(--brand-gray);
+  }
+
+  .tooltip.bs-tooltip-end .tooltip-arrow::before {
+    border-right-color: var(--brand-gray);
+  }
+}
+
+/* ============================================
+   Scroll / Overflow Styles
+   ============================================ */
+
+@layer components {
+  .scrollMoreContainer:before {
+    content: '';
+    position: absolute;
+    display: flex;
+    left: 0;
+    right: 0;
+    top: 300px;
+    bottom: 0px;
+    background: linear-gradient(0deg, rgba(255, 255, 255, 1) 0%, rgba(0, 0, 0, 0) 100%);
+  }
+
+  @media (max-width: 575px) {
+    .scrollMoreContainer {
+      display: none;
+    }
+  }
+}
+
+/* ============================================
+   Drag & Drop File Upload
+   ============================================ */
+
+@layer components {
+  .dragover {
+    background-color: var(--bg-dark) !important;
+    border: 2px dashed var(--brand-green) !important;
+  }
+}
+
+/* ============================================
+   Markdown Links
+   ============================================ */
+
+@layer components {
+  .markdown a {
+    color: var(--brand-pink) !important;
+    font-weight: bold;
+  }
+}
+
+/* ============================================
+   Blot Formatter (Quill editor)
+   ============================================ */
+
+@layer components {
+  .blot-formatter__toolbar {
+    display: none;
+  }
+}
+
+/* ============================================
+   Responsive container overrides (legacy bootstrap parity)
+   ============================================ */
+
+@layer components {
+  @media (min-width: 1200px) {
+    .container,
+    .container-lg,
+    .container-xl,
+    .container-xxl {
+      width: 992px !important;
+      max-width: 992px !important;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .container,
+    .container-lg,
+    .container-xl,
+    .container-xxl {
+      max-width: none !important;
+    }
+  }
+
+  @media (max-width: 991px) {
+    .manager .container,
+    .manager [class^='container-'] {
+      max-width: none !important;
+    }
+
+    .wrapper > .container:has(.navbar) {
+      max-width: none !important;
+    }
   }
 }
