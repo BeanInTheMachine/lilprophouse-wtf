@@ -189,3 +189,123 @@ export function useVotesByAddress(address: string) {
 
   return state;
 }
+
+export function useRounds(houseId: number) {
+  const [state, setState] = useState<UseApiState<any[]>>({
+    data: null,
+    loading: true,
+    error: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchRounds() {
+      setState((s) => ({ ...s, loading: true, error: null }));
+      try {
+        const data = await get<any[]>(`/api/rounds?houseId=${houseId}`);
+        if (!cancelled) setState({ data, loading: false, error: null });
+      } catch (err) {
+        if (!cancelled) setState({ data: null, loading: false, error: (err as Error).message });
+      }
+    }
+
+    if (houseId) fetchRounds();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [houseId]);
+
+  return state;
+}
+
+export function useProposals(roundId: number) {
+  const [state, setState] = useState<UseApiState<any[]>>({
+    data: null,
+    loading: true,
+    error: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchProposals() {
+      setState((s) => ({ ...s, loading: true, error: null }));
+      try {
+        const data = await get<any[]>(`/api/rounds/${roundId}/proposals`);
+        if (!cancelled) setState({ data, loading: false, error: null });
+      } catch (err) {
+        if (!cancelled) setState({ data: null, loading: false, error: (err as Error).message });
+      }
+    }
+
+    if (roundId) fetchProposals();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roundId]);
+
+  return state;
+}
+
+export function useFeaturedRounds() {
+  const [state, setState] = useState<UseApiState<any[]>>({
+    data: null,
+    loading: true,
+    error: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetch() {
+      setState((s) => ({ ...s, loading: true, error: null }));
+      try {
+        const data = await get<any[]>('/api/rounds?state=active');
+        if (!cancelled) setState({ data, loading: false, error: null });
+      } catch (err) {
+        if (!cancelled) setState({ data: null, loading: false, error: (err as Error).message });
+      }
+    }
+
+    fetch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return state;
+}
+
+export function usePlatformStats() {
+  const [state, setState] = useState<UseApiState<{ houses: number; rounds: number; proposals: number; votes: number }>>({
+    data: null,
+    loading: true,
+    error: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetch() {
+      setState((s) => ({ ...s, loading: true, error: null }));
+      try {
+        const data = await get<any>('/api/stats');
+        if (!cancelled) setState({ data, loading: false, error: null });
+      } catch (err) {
+        if (!cancelled) setState({ data: null, loading: false, error: (err as Error).message });
+      }
+    }
+
+    fetch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return state;
+}
