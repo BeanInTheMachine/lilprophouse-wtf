@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model House {
+  id              Int      @id @default(autoincrement())
+  visible         Boolean  @default(true)
+  contractAddress String
+  name            String
+  profileImageUrl String
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  rounds          Round[]
+}
+
+enum RoundType {
+  TIMED
+  INFINITE
+}
+
+enum RoundState {
+  NOT_STARTED
+  ACCEPTING_PROPOSALS
+  VOTING
+  COMPLETED
+  CANCELLED
+}
+
+model Round {
+  id                      Int       @id @default(autoincrement())
+  visible                 Boolean   @default(true)
+  type                    RoundType
+  title                   String
+  description             String?
+  fundingAmount           Decimal   @default(0)
+  currencyType            String?
+  numWinners              Int
+  startTime               DateTime
+  proposalEndTime         DateTime?
+  votingEndTime           DateTime?
+  balanceBlockTag         Int       @default(0)
+  propStrategy            Json
+  voteStrategy            Json
+  propStrategyDescription String?
+  voteStrategyDescription String?
+  displayComments         Boolean   @default(true)
+  quorumFor               Int?
+  quorumAgainst           Int?
+  votingPeriod            Int?
+  state                   RoundState @default(NOT_STARTED)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  houseId Int
+  house   House @relation(fields: [houseId], references: [id])
+
+  proposals Proposal[]
+}
+
+enum Direction {
+  FOR
+  AGAINST
+  ABSTAIN
+}
+
+model Proposal {
+  id              Int      @id @default(autoincrement())
+  title           String
+  content         String
+  tldr            String
+  address         String
+  reqAmount       Decimal?
+  voteCountFor    Int      @default(0)
+  voteCountAgainst Int     @default(0)
+  deletedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  roundId Int
+  round   Round @relation(fields: [roundId], references: [id])
+
+  votes Vote[]
+}
+
+model Vote {
+  id               Int       @id @default(autoincrement())
+  direction        Direction
+  weight           Int
+  blockHeight      Int       @default(0)
+  address          String
+  communityAddress String
+  signature        String
+  signedMessage    String
+  createdAt        DateTime  @default(now())
+
+  proposalId Int
+  proposal   Proposal @relation(fields: [proposalId], references: [id])
+
+  roundId Int
+}
+
+model File {
+  id            Int      @id @default(autoincrement())
+  hidden        Boolean  @default(false)
+  address       String
+  name          String
+  mimeType      String
+  ipfsHash      String
+  pinSize       String
+  ipfsTimestamp String
+  createdAt     DateTime @default(now())
+}
