@@ -554,13 +554,19 @@
   object-fit: cover;
   object-position: left top;
   width: auto;
-  z-index: 998;
+  z-index: 1;
   pointer-events: none;
 }
 
 .homeHeroWrap {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  padding-bottom: 2rem;
+}
+
+.homeHeroContent {
+  position: relative;
+  z-index: 2;
 }
 
 .homeCityImg {

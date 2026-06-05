@@ -4,7 +4,7 @@ export default function Home() {
       {/* Hero Section */}
       <section className="homeGradientBg homeHeroWrap">
         <div className="container mx-auto px-4 relative">
-          <div className="flex min-h-[75vh]">
+          <div className="flex min-h-[75vh] homeHeroContent">
             <div className="w-full lg:w-8/12 pt-8 lg:pt-0 flex flex-col justify-center">
               <h1 className="font-bold text-6xl text-brand-black">Prop House</h1>
               <p className="text-[25px] text-brand-gray mt-2 max-w-xl">
