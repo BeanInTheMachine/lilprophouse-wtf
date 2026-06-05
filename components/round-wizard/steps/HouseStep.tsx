@@ -35,6 +35,9 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
     );
   }
 
+  const myHouses = houses?.filter((h: any) => h.contractAddress === address?.toLowerCase()) ?? [];
+  const hasHouse = myHouses.length > 0;
+
   if (showNewHouseForm) {
     return (
       <div className="flex flex-col gap-5">
@@ -128,9 +131,9 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
         </div>
       )}
 
-      {!loading && !error && houses && houses.length > 0 && (
+      {!loading && !error && myHouses.length > 0 && (
         <div className="grid gap-3">
-          {houses.map((house: any) => (
+          {myHouses.map((house: any) => (
             <Card
               key={house.id}
               onClick={() =>
@@ -169,11 +172,12 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
         </div>
       )}
 
-      {!loading && !error && (!houses || houses.length === 0) && (
-        <p className="text-sm text-brand-gray py-4">You don&apos;t own any houses yet.</p>
+      {!loading && !error && myHouses.length === 0 && (
+        <p className="text-sm text-brand-gray py-4">You don&apos;t own any houses yet. Create one below to get started.</p>
       )}
 
-      <div className="border-t border-border-light pt-4">
+      {!hasHouse && (
+        <div className="border-t border-border-light pt-4">
         <Card
           onClick={() => setShowNewHouseForm(true)}
           className="p-4 flex items-center gap-4 cursor-pointer hover:border-brand-purple transition-colors"
@@ -185,6 +189,7 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
           <span className="text-brand-gray text-lg flex-shrink-0 ml-auto">&rarr;</span>
         </Card>
       </div>
+      )}
     </div>
   );
 }
