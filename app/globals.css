@@ -541,24 +541,33 @@
 
 .homeStatsContainer {
   margin-top: -20vh;
+  position: relative;
+  z-index: 1;
 }
 
 .homeHeaderImg {
   position: absolute;
   right: 0;
-  padding-right: 0;
-  max-height: 100%;
-  height: 70vh;
+  top: 0;
+  max-height: 65vh;
+  height: 65vh;
   object-fit: cover;
+  object-position: left top;
   width: auto;
-  z-index: 999;
+  z-index: 998;
   pointer-events: none;
+}
+
+.homeHeroWrap {
+  position: relative;
+  overflow: hidden;
 }
 
 .homeCityImg {
   position: relative;
   left: 4rem;
   width: 75vw;
+  max-width: none;
   margin-top: 0;
   z-index: 2;
 }
@@ -573,11 +582,13 @@
   justify-content: center;
   align-items: flex-start;
   gap: 70px;
+  flex-wrap: wrap;
 }
 
 .homeStatItem {
   display: flex;
   flex-direction: column;
+  text-align: center;
 }
 
 .homeStatNumber {
@@ -612,14 +623,16 @@
   text-align: left;
 }
 
-.homeHandMoonContainer {
+.homeHandMoonWrap {
   position: relative;
 }
 
-.homeHandMoonContainer img {
+.homeHandMoonWrap img {
   position: absolute;
   width: 25vw;
-  z-index: 999;
+  max-width: 400px;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .homeHand {
@@ -632,16 +645,23 @@
   margin-top: -10vh;
 }
 
+.homeExploreSection {
+  position: relative;
+  z-index: 0;
+  padding-top: 4rem;
+  padding-bottom: 6rem;
+}
+
 @media (min-width: 1200px) and (max-width: 1600px) {
   .homeStatsContainer { margin-top: -25vh; }
-  .homeHeaderImg { height: 60vh; }
+  .homeHeaderImg { height: 55vh; max-height: 55vh; }
   .homeHand { margin-top: -7vh; }
   .homeMoon { margin-top: -7vh; }
 }
 
 @media (min-width: 992px) and (max-width: 1200px) {
   .homeStatsContainer { margin-top: -30vh; }
-  .homeHeaderImg { height: 55vh; }
+  .homeHeaderImg { height: 50vh; max-height: 50vh; }
   .homeHand { margin-top: -4vh; }
   .homeMoon { margin-top: -4vh; }
 }
@@ -674,11 +694,11 @@
   .homeStatNumber { font-size: 32px; }
   .homeStatLabel { font-size: 18px; }
   .homeStatsFlex { gap: 40px; }
-  .homeHandMoonContainer img { width: 40vw; }
+  .homeHandMoonWrap img { width: 40vw; max-width: none; }
 }
 
 @media (max-width: 576px) {
-  .homeHeaderImg { height: 35vh; margin-top: -17vh; }
+  .homeHeaderImg { height: 30vh; max-height: 30vh; margin-top: -10vh; }
   .homeStatsContainer { margin-top: 3vh; }
   .homeStatNumber { font-size: 20px; }
   .homeStatLabel { font-size: 12px; }
