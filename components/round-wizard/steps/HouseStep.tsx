@@ -239,17 +239,15 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
         <p className="text-sm text-brand-gray py-4">You don&apos;t own any houses yet. Create one below to get started.</p>
       )}
 
-      {!hasHouse && (
-        <div className="border-t border-border-light pt-4">
-          <Card onClick={() => setShowNewHouseForm(true)} className="p-4 flex items-center gap-4 cursor-pointer hover:border-brand-purple transition-colors">
-            <div className="w-12 h-12 rounded-full overflow-hidden bg-brand-purple-hint flex-shrink-0 flex items-center justify-center">
-              <span className="text-brand-purple text-xl font-bold">+</span>
-            </div>
-            <p className="font-bold text-sm text-brand-black">Create a new house</p>
-            <span className="text-brand-gray text-lg flex-shrink-0 ml-auto">&rarr;</span>
-          </Card>
-        </div>
-      )}
+      <div className="border-t border-border-light pt-4">
+        <Card onClick={() => setShowNewHouseForm(true)} className="p-4 flex items-center gap-4 cursor-pointer hover:border-brand-purple transition-colors">
+          <div className="w-12 h-12 rounded-full overflow-hidden bg-brand-purple-hint flex-shrink-0 flex items-center justify-center">
+            <span className="text-brand-purple text-xl font-bold">+</span>
+          </div>
+          <p className="font-bold text-sm text-brand-black">Create a new house</p>
+          <span className="text-brand-gray text-lg flex-shrink-0 ml-auto">&rarr;</span>
+        </Card>
+      </div>
     </div>
   );
 }
