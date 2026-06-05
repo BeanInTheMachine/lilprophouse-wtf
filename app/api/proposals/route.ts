@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createProposal } from '@/lib/services/proposalService';
 import { validateRequired, isValidEthereumAddress } from '@/lib/validations';
 import { prisma } from '@/lib/prisma';
+import { verifyEip712Signature, PROPOSAL_MESSAGE_TYPES, unauthorizedResponse } from '@/lib/eip712';
 
 export async function GET(request: Request) {
   try {
@@ -34,6 +35,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+
+    const hasSignature = body.signedData?.signature;
+
+    if (hasSignature) {
+      const { valid, signer, error } = await verifyEip712Signature(body, PROPOSAL_MESSAGE_TYPES);
+      if (!valid) return NextResponse.json({ error: error ?? 'Signature verification failed' }, { status: 401 });
+      if (signer !== body.address?.toLowerCase()) {
+        return NextResponse.json({ error: 'Signer does not match address' }, { status: 401 });
+      }
+    }
 
     const missing = validateRequired(body, ['title', 'content', 'tldr', 'address', 'roundId']);
     if (missing) {
