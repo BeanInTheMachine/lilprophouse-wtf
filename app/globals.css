@@ -576,12 +576,12 @@
   bottom: 0;
   width: 60vw;
   max-width: none;
-  z-index: 2;
+  z-index: 10;
 }
 
 .homeCitySection {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   min-height: 30vh;
 }
 
