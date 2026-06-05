@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useReducer } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import InputFormGroup from '@/components/ui/InputFormGroup';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -49,6 +49,8 @@ const STEPS = ['Type', 'Details', 'Schedule', 'Review'];
 
 export default function CreateRoundPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const houseId = parseInt(searchParams.get('houseId') ?? '1', 10) || 1;
   const [step, setStep] = useState(0);
   const [state, dispatch] = useReducer(reducer, initialState);
   const [loading, setLoading] = useState(false);
@@ -88,7 +90,7 @@ export default function CreateRoundPage() {
         currencyType: state.currencyType || null,
         numWinners: Number(state.numWinners),
         startTime: new Date(state.startTime).toISOString(),
-        houseId: 1,
+        houseId: houseId,
         propStrategy: { type: 'all' },
         voteStrategy: { type: 'all' },
       };
