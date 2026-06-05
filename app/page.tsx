@@ -3,7 +3,7 @@ export default function Home() {
     <div>
       {/* Hero Section */}
       <section className="homeGradientBg homeHeroWrap">
-        <div className="container mx-auto px-4 relative">
+        <div className="container mx-auto px-4">
           <div className="flex min-h-[75vh] homeHeroContent">
             <div className="w-full lg:w-8/12 pt-8 lg:pt-0 flex flex-col justify-center">
               <h1 className="font-bold text-6xl text-brand-black">Prop House</h1>
@@ -20,8 +20,8 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <img src="/Props_FIN11.png" alt="" className="homeHeaderImg hidden lg:block" />
         </div>
+        <img src="/Props_FIN11.png" alt="" className="homeHeaderImg hidden lg:block" />
       </section>
 
       {/* Stats Section */}
