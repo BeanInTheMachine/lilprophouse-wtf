@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useAccount } from 'wagmi';
+import { useState, useMemo, useEffect } from 'react';
+import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { useHouses } from '@/lib/hooks/useApi';
-import { useHousesOnChain, useHouseMetadata } from '@/lib/hooks/useOnChain';
+import { useHousesOnChain, useHouseMetadata, useCreateHouseOnChain } from '@/lib/hooks/useOnChain';
 import Card from '@/components/ui/Card';
 import InputFormGroup from '@/components/ui/InputFormGroup';
 import Button from '@/components/ui/Button';
@@ -11,7 +11,7 @@ import LoadingIndicator from '@/components/ui/LoadingIndicator';
 import Image from 'next/image';
 import type { HouseInfo } from '@/lib/hooks/useWizardState';
 import { post } from '@/lib/api-client';
-import { isAddress } from 'viem';
+import { isAddress, decodeEventLog, type Log } from 'viem';
 
 interface HouseStepProps {
   onSelectHouse: (house: HouseInfo) => void;
@@ -41,6 +41,82 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
   const [newImage, setNewImage] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
+  const [houseAddress, setHouseAddress] = useState<string | null>(null);
+
+  const { createHouse, isPending: isDeploying } = useCreateHouseOnChain();
+  const { isLoading: isWaiting, data: receipt } = useWaitForTransactionReceipt({
+    hash: txHash ?? undefined,
+  });
+
+  // When tx is confirmed, extract house address and store in DB
+  useEffect(() => {
+    (async () => {
+      if (!receipt || !txHash || !address || houseAddress) return;
+
+      try {
+        const houseCreatedEvent = receipt.logs.find((log: Log) =>
+          log.topics[0]?.toLowerCase() === '0x1f5335a1b520cd23d72b28e6b2c6c35875db987a43d4eda7cac05a0f7efcf3c1'
+        );
+
+        let deployedAddress: string | null = null;
+
+        if (houseCreatedEvent) {
+          try {
+            const decoded = decodeEventLog({
+              abi: [{ type: 'event', name: 'HouseCreated', inputs: [
+                { name: 'house', type: 'address', indexed: true },
+                { name: 'creator', type: 'address', indexed: true },
+              ]}],
+              data: houseCreatedEvent.data,
+              topics: houseCreatedEvent.topics,
+            });
+            deployedAddress = (decoded.args as any).house as string;
+          } catch {}
+        }
+
+        if (!deployedAddress) {
+          deployedAddress = address;
+        }
+
+        setHouseAddress(deployedAddress);
+
+        const house = await post<any>('/api/houses', {
+          contractAddress: deployedAddress,
+          name: newName.trim(),
+          description: newDescription.trim() || null,
+          profileImageUrl: newImage.trim() || '',
+        });
+
+        onSelectHouse({
+          id: house.id,
+          address: deployedAddress,
+          name: house.name,
+          image: house.profileImageUrl,
+          description: house.description ?? '',
+          contractURI: '',
+          existingHouse: true,
+        });
+      } catch (e: any) {
+        setCreateError(e.message ?? 'Failed to store house');
+        setCreating(false);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receipt]);
+
+  async function handleCreateHouse() {
+    if (!newName.trim() || !address) return;
+    setCreating(true);
+    setCreateError('');
+    try {
+      const hash = await createHouse(newName.trim(), newDescription.trim(), newImage.trim() || '');
+      setTxHash(hash);
+    } catch (e: any) {
+      setCreateError(e.message ?? 'Transaction failed');
+      setCreating(false);
+    }
+  }
 
   if (!isConnected) {
     return (
@@ -121,35 +197,10 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => setShowNewHouseForm(false)}>Back</Button>
           <Button
-            onClick={async () => {
-              if (!newName.trim() || !address) return;
-              setCreating(true);
-              setCreateError('');
-              try {
-                const house = await post<any>('/api/houses', {
-                  contractAddress: address,
-                  name: newName.trim(),
-                  description: newDescription.trim() || null,
-                  profileImageUrl: newImage.trim() || '',
-                });
-                onSelectHouse({
-                  id: house.id,
-                  address: address,
-                  name: house.name,
-                  image: house.profileImageUrl,
-                  description: house.description ?? '',
-                  contractURI: '',
-                  existingHouse: false,
-                });
-              } catch (e: any) {
-                setCreateError(e.message ?? 'Failed to create house');
-              } finally {
-                setCreating(false);
-              }
-            }}
-            disabled={creating || !newName.trim()}
+            onClick={handleCreateHouse}
+            disabled={creating || isDeploying || isWaiting || !newName.trim()}
           >
-            {creating ? 'Creating...' : 'Create house'}
+            {isDeploying ? 'Confirm in wallet...' : isWaiting ? 'Deploying...' : creating ? 'Storing...' : 'Create house'}
           </Button>
         </div>
       </div>
