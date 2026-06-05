@@ -46,11 +46,13 @@ export default function CreateRoundPage() {
       title: round.title,
       what: round.description || '',
       tldr: `${round.roundType} round · ${round.numWinners} winner${round.numWinners !== 1 ? 's' : ''} · ${round.awards[0]?.allocated ?? 0} ${round.awards[0]?.type === 'ETH' ? 'ETH' : (round.awards[0]?.symbol ?? '')}`,
-      parentAuctionId: BigInt(round.house.id),
+      parentAuctionId: round.house.id,
       parentType: 'auction',
     };
 
     try {
+      const signedMessageString = JSON.stringify(payload);
+
       const signature = await signTypedDataAsync({
         domain: DOMAIN_SEPARATOR,
         types: PROPOSAL_MESSAGE_TYPES,
@@ -58,9 +60,7 @@ export default function CreateRoundPage() {
         message: payload,
       });
 
-      const signedMessageString = JSON.stringify(payload);
       const signedData = {
-        message: Buffer.from(signedMessageString).toString('base64'),
         signature,
         signer: address,
       };
