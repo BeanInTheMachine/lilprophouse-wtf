@@ -32,6 +32,7 @@ export async function POST(request: Request) {
 
     const round = await prisma.round.create({
       data: {
+        state: body.state ?? 'ACCEPTING_PROPOSALS',
         type: body.type ?? 'TIMED',
         title: body.title,
         description: body.description ?? null,
