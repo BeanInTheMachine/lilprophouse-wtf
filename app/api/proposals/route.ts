@@ -1,6 +1,35 @@
 import { NextResponse } from 'next/server';
 import { createProposal } from '@/lib/services/proposalService';
 import { validateRequired, isValidEthereumAddress } from '@/lib/validations';
+import { prisma } from '@/lib/prisma';
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const roundId = searchParams.get('roundId');
+    const limit = Math.min(Number(searchParams.get('limit')) || 50, 100);
+    const skip = Number(searchParams.get('skip')) || 0;
+
+    const proposals = await prisma.proposal.findMany({
+      where: {
+        deletedAt: null,
+        ...(roundId ? { roundId: Number(roundId) } : {}),
+      },
+      include: {
+        votes: true,
+        round: { include: { house: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip,
+    });
+
+    return NextResponse.json(proposals);
+  } catch (error) {
+    console.error('GET /api/proposals error:', error);
+    return NextResponse.json({ error: 'Failed to fetch proposals' }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   try {
