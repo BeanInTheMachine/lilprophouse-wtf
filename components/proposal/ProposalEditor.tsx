@@ -32,8 +32,8 @@ export default function ProposalEditor({ onSubmit, isLoading = false, showReqAmo
     return Object.keys(errs).length === 0;
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!validate()) return;
     onSubmit({
       title: title.trim(),
@@ -90,7 +90,7 @@ export default function ProposalEditor({ onSubmit, isLoading = false, showReqAmo
       )}
 
       <div className="flex justify-end mt-2">
-        <Button type="submit" disabled={isLoading}>
+        <Button onClick={handleSubmit} disabled={isLoading}>
           {isLoading ? 'Submitting...' : 'Submit Proposal'}
         </Button>
       </div>
