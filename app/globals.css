@@ -571,12 +571,18 @@
 }
 
 .homeCityImg {
-  position: relative;
-  left: 4rem;
-  width: 75vw;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 60vw;
   max-width: none;
-  margin-top: 0;
   z-index: 2;
+}
+
+.homeCitySection {
+  position: relative;
+  overflow: hidden;
+  min-height: 30vh;
 }
 
 .homeCityTitleCol {
@@ -695,10 +701,11 @@
   }
   .homeCityImg {
     position: static;
-    left: auto;
     width: 100vw;
   }
-  .homeStatNumber { font-size: 32px; }
+  .homeCitySection {
+    min-height: auto;
+  }
   .homeStatLabel { font-size: 18px; }
   .homeStatsFlex { gap: 40px; }
   .homeHandMoonWrap img { width: 40vw; max-width: none; }

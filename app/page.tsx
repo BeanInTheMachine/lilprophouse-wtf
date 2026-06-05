@@ -50,7 +50,7 @@ export default function Home() {
       </div>
 
       {/* Born in Nouns */}
-      <section className="break-out bg-white overflow-hidden">
+      <section className="break-out bg-white homeCitySection">
         <div className="container mx-auto px-4">
           <div className="flex flex-col lg:flex-row items-center">
             <div className="homeCityTitleCol lg:w-6/12 py-8 text-center lg:text-left">
@@ -59,11 +59,9 @@ export default function Home() {
                 Prop House is a project born and funded by Nouns. It serves as an open invitation for all onchain communities to build the world they want to see.
               </p>
             </div>
-            <div className="lg:w-6/12 overflow-visible">
-              <img src="/ph-city.png" alt="onchain city" className="homeCityImg" />
-            </div>
           </div>
         </div>
+        <img src="/ph-city.png" alt="onchain city" className="homeCityImg hidden lg:block" />
       </section>
 
       {/* Empower Builders */}
