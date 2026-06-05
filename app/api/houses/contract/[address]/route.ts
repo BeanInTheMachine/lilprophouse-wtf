@@ -3,10 +3,11 @@ import { getHouseByContractAddress } from '@/lib/services/houseService';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { address: string } },
+  { params }: { params: Promise<{ address: string }> },
 ) {
   try {
-    const house = await getHouseByContractAddress(params.address);
+    const { address } = await params;
+    const house = await getHouseByContractAddress(address);
 
     if (!house) {
       return NextResponse.json({ error: 'House not found' }, { status: 404 });

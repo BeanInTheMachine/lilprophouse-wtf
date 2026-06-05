@@ -5,9 +5,10 @@ export const runtime = 'edge';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { address: string } },
+  { params }: { params: Promise<{ address: string }> },
 ) {
-  const house = await getHouseByContractAddress(params.address);
+  const { address } = await params;
+  const house = await getHouseByContractAddress(address);
 
   return new ImageResponse(
     (

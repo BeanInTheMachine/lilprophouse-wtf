@@ -3,10 +3,11 @@ import { getProposalsForRound } from '@/lib/services/proposalService';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { roundId: string } },
+  { params }: { params: Promise<{ roundId: string }> },
 ) {
   try {
-    const roundId = parseInt(params.roundId, 10);
+    const { roundId: idStr } = await params;
+    const roundId = parseInt(idStr, 10);
     if (isNaN(roundId)) {
       return NextResponse.json({ error: 'Invalid round ID' }, { status: 400 });
     }

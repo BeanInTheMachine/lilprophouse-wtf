@@ -3,9 +3,10 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { address: string } },
+  { params }: { params: Promise<{ address: string }> },
 ) {
   try {
+    const { address: _addr } = await params;
     const round = await prisma.round.findFirst({
       where: { visible: true },
       include: {

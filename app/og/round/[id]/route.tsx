@@ -5,9 +5,10 @@ export const runtime = 'edge';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const roundId = parseInt(params.id, 10);
+  const { id: idStr } = await params;
+  const roundId = parseInt(idStr, 10);
   const round = !isNaN(roundId) ? await getRoundById(roundId) : null;
 
   const statusColor =

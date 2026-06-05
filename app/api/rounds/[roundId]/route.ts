@@ -4,10 +4,11 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { roundId: string } },
+  { params }: { params: Promise<{ roundId: string }> },
 ) {
   try {
-    const id = parseInt(params.roundId, 10);
+    const { roundId: idStr } = await params;
+    const id = parseInt(idStr, 10);
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid round ID' }, { status: 400 });
 
     const round = await getRoundById(id);
@@ -22,10 +23,11 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { roundId: string } },
+  { params }: { params: Promise<{ roundId: string }> },
 ) {
   try {
-    const id = parseInt(params.roundId, 10);
+    const { roundId: idStr } = await params;
+    const id = parseInt(idStr, 10);
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid round ID' }, { status: 400 });
 
     const body = await request.json();

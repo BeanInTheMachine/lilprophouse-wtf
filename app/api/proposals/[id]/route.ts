@@ -4,10 +4,11 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const proposalId = parseInt(params.id, 10);
+    const { id: idStr } = await params;
+    const proposalId = parseInt(idStr, 10);
     if (isNaN(proposalId)) return NextResponse.json({ error: 'Invalid proposal ID' }, { status: 400 });
 
     const proposal = await getProposalById(proposalId);
@@ -22,10 +23,11 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const id = parseInt(params.id, 10);
+    const { id: idStr } = await params;
+    const id = parseInt(idStr, 10);
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid proposal ID' }, { status: 400 });
 
     const body = await request.json();
@@ -50,10 +52,11 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const id = parseInt(params.id, 10);
+    const { id: idStr } = await params;
+    const id = parseInt(idStr, 10);
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid proposal ID' }, { status: 400 });
 
     const body = await request.json();

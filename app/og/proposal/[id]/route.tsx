@@ -5,9 +5,10 @@ export const runtime = 'edge';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const proposalId = parseInt(params.id, 10);
+  const { id: idStr } = await params;
+  const proposalId = parseInt(idStr, 10);
   const proposal = !isNaN(proposalId) ? await getProposalById(proposalId) : null;
 
   const totalVotes = (proposal?.voteCountFor ?? 0) + (proposal?.voteCountAgainst ?? 0);

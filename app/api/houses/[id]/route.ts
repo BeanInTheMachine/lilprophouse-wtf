@@ -4,10 +4,11 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const id = parseInt(params.id, 10);
+    const { id: idStr } = await params;
+    const id = parseInt(idStr, 10);
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid house ID' }, { status: 400 });
 
     const house = await getHouseById(id);
@@ -22,10 +23,11 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const id = parseInt(params.id, 10);
+    const { id: idStr } = await params;
+    const id = parseInt(idStr, 10);
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid house ID' }, { status: 400 });
 
     const body = await request.json();
