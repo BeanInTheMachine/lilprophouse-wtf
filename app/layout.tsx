@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Inter, Londrina_Solid } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -28,7 +30,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} ${londrinaSolid.variable} antialiased`}>
-        <Providers>{children}</Providers>
+        <Providers>
+          <div className="flex flex-col min-h-screen max-w-screen">
+            <Header />
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </div>
+        </Providers>
       </body>
     </html>
   );
