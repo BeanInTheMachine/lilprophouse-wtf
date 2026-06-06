@@ -100,6 +100,32 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
     if (!newName.trim() || !address) return;
     setCreating(true);
     setCreateError('');
+
+    // Off-chain mode: skip contract deployment, store directly in DB
+    if (process.env.NEXT_PUBLIC_SKIP_ONCHAIN === 'true') {
+      try {
+        const house = await post<any>('/api/houses', {
+          contractAddress: address,
+          name: newName.trim(),
+          description: newDescription.trim() || null,
+          profileImageUrl: newImage.trim() || '',
+        });
+        onSelectHouse({
+          id: house.id,
+          address: address,
+          name: house.name,
+          image: house.profileImageUrl,
+          description: house.description ?? '',
+          contractURI: '',
+          existingHouse: false,
+        });
+      } catch (e: any) {
+        setCreateError(e.message ?? 'Failed to create house');
+        setCreating(false);
+      }
+      return;
+    }
+
     try {
       const hash = await createHouse(newName.trim(), newDescription.trim(), newImage.trim() || '');
       setTxHash(hash);

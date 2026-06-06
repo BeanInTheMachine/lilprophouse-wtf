@@ -47,7 +47,7 @@ export default function CreateRoundPage() {
     setIsCreating(true);
 
     try {
-      // Deploy round on-chain
+      // Deploy round on-chain (or skip if NEXT_PUBLIC_SKIP_ONCHAIN=true)
       const hash = await createTimedRound(
         round.house.address,
         round.title,
@@ -58,6 +58,11 @@ export default function CreateRoundPage() {
         round.numWinners,
       );
       setTxHash(hash);
+
+      // If skipping on-chain, store directly without waiting for receipt
+      if (process.env.NEXT_PUBLIC_SKIP_ONCHAIN === 'true') {
+        await storeRoundInDb();
+      }
     } catch (err: any) {
       if (err.message?.includes('rejected') || err.message?.includes('denied')) {
         setIsCreating(false);
@@ -68,64 +73,69 @@ export default function CreateRoundPage() {
     }
   }
 
-  // When tx is confirmed, store metadata in DB and navigate
+  async function storeRoundInDb() {
+    if (!address) return;
+
+    const payload = {
+      title: round.title,
+      what: round.description || '',
+      tldr: `${round.roundType} round · ${round.numWinners} winner${round.numWinners !== 1 ? 's' : ''}`,
+      parentAuctionId: round.house.id,
+      parentType: 'auction',
+    };
+
+    const signedMessageString = JSON.stringify(payload);
+
+    const signature = await signTypedDataAsync({
+      domain: DOMAIN_SEPARATOR,
+      types: PROPOSAL_MESSAGE_TYPES,
+      primaryType: 'Proposal',
+      message: payload,
+    });
+
+    const signedData = {
+      message: Buffer.from(signedMessageString).toString('base64'),
+      signature,
+      signer: address,
+    };
+
+    const data = await post<any>('/api/rounds', {
+      type: round.roundType,
+      title: round.title,
+      description: round.description || null,
+      fundingAmount: round.awards[0]?.allocated ?? 0,
+      currencyType: round.awards[0]?.type === 'ETH' ? 'ETH' : (round.awards[0]?.symbol ?? 'ETH'),
+      numWinners: round.numWinners,
+      startTime: new Date(round.proposalPeriodStartUnixTimestamp * 1000).toISOString(),
+      proposalEndTime: round.proposalPeriodDurationSecs > 0
+        ? new Date((round.proposalPeriodStartUnixTimestamp + round.proposalPeriodDurationSecs) * 1000).toISOString()
+        : null,
+      votingEndTime: round.votePeriodDurationSecs > 0
+        ? new Date((round.proposalPeriodStartUnixTimestamp + round.proposalPeriodDurationSecs + round.votePeriodDurationSecs) * 1000).toISOString()
+        : null,
+      houseId: round.house.id,
+      propStrategy: { type: 'custom', voters: round.voters },
+      voteStrategy: { type: 'custom', voters: round.voters },
+      quorumFor: round.quorumFor,
+      quorumAgainst: round.quorumAgainst,
+      votingPeriod: round.votingPeriod,
+      address,
+      signedData,
+      messageTypes: PROPOSAL_MESSAGE_TYPES,
+      domainSeparator: DOMAIN_SEPARATOR,
+    });
+
+    router.push(`/rounds/${data.id}`);
+  }
+
+  // When tx is confirmed (and not skipped), store metadata in DB and navigate
   useEffect(() => {
-    (async () => {
-      if (!receipt || !txHash || !address) return;
+    if (!receipt || !txHash || !address || process.env.NEXT_PUBLIC_SKIP_ONCHAIN === 'true') return;
 
-      try {
-        const payload = {
-          title: round.title,
-          what: round.description || '',
-          tldr: `${round.roundType} round · ${round.numWinners} winner${round.numWinners !== 1 ? 's' : ''}`,
-          parentAuctionId: round.house.id,
-          parentType: 'auction',
-        };
-
-        const signature = await signTypedDataAsync({
-          domain: DOMAIN_SEPARATOR,
-          types: PROPOSAL_MESSAGE_TYPES,
-          primaryType: 'Proposal',
-          message: payload,
-        });
-
-        const signedData = {
-          signature,
-          signer: address,
-        };
-
-        const data = await post<any>('/api/rounds', {
-          type: round.roundType,
-          title: round.title,
-          description: round.description || null,
-          fundingAmount: round.awards[0]?.allocated ?? 0,
-          currencyType: round.awards[0]?.type === 'ETH' ? 'ETH' : (round.awards[0]?.symbol ?? 'ETH'),
-          numWinners: round.numWinners,
-          startTime: new Date(round.proposalPeriodStartUnixTimestamp * 1000).toISOString(),
-          proposalEndTime: round.proposalPeriodDurationSecs > 0
-            ? new Date((round.proposalPeriodStartUnixTimestamp + round.proposalPeriodDurationSecs) * 1000).toISOString()
-            : null,
-          votingEndTime: round.votePeriodDurationSecs > 0
-            ? new Date((round.proposalPeriodStartUnixTimestamp + round.proposalPeriodDurationSecs + round.votePeriodDurationSecs) * 1000).toISOString()
-            : null,
-          houseId: round.house.id,
-          propStrategy: { type: 'custom', voters: round.voters },
-          voteStrategy: { type: 'custom', voters: round.voters },
-          quorumFor: round.quorumFor,
-          quorumAgainst: round.quorumAgainst,
-          votingPeriod: round.votingPeriod,
-          address,
-          signedData,
-          messageTypes: PROPOSAL_MESSAGE_TYPES,
-          domainSeparator: DOMAIN_SEPARATOR,
-        });
-
-        router.push(`/rounds/${data.id}`);
-      } catch (err: any) {
-        alert(err.message ?? 'Failed to store round');
-        setIsCreating(false);
-      }
-    })();
+    storeRoundInDb().catch((err) => {
+      alert(err.message ?? 'Failed to store round');
+      setIsCreating(false);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receipt]);
 

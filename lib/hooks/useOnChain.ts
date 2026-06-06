@@ -126,6 +126,10 @@ export function useCreateHouseOnChain() {
   async function createHouse(name: string, description: string, imageURI: string) {
     setError(null);
     try {
+      if (process.env.NEXT_PUBLIC_SKIP_ONCHAIN === 'true') {
+        return `0x${'0'.repeat(64)}` as `0x${string}`;
+      }
+
       const config = encodeAbiParameters(
         [{ type: 'string' }, { type: 'string' }, { type: 'string' }],
         [name, description, imageURI],
@@ -165,6 +169,9 @@ export function useCreateTimedRoundOnChain() {
   ) {
     setError(null);
     try {
+      if (process.env.NEXT_PUBLIC_SKIP_ONCHAIN === 'true') {
+        return `0x${'0'.repeat(64)}` as `0x${string}`;
+      }
       const roundConfig = encodeAbiParameters(
         [
           { type: 'uint256' },
