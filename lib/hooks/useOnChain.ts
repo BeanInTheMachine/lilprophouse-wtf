@@ -303,6 +303,67 @@ export function useHasCreatorPass(houseId?: number) {
 }
 
 /**
+ * Deposit ETH into a round contract via PropHouse.depositTo.
+ */
+export function useDepositToRound() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  async function depositEth(roundAddress: string, amountEth: string) {
+    setError(null);
+    try {
+      const amountWei = BigInt(Math.floor(parseFloat(amountEth) * 1e18));
+      const asset = {
+        assetType: 0, // ETH
+        assetAddress: '0x0000000000000000000000000000000000000000' as Address,
+        amount: amountWei,
+        tokenId: 0n,
+      };
+
+      const tx = await writeContractAsync({
+        address: PROP_HOUSE_ADDRESS,
+        abi: PROP_HOUSE_ABI,
+        functionName: 'depositTo',
+        args: [roundAddress as Address, asset],
+        value: amountWei,
+      });
+      return tx;
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { depositEth, isPending, error };
+}
+
+/**
+ * Claim an award from a round contract (winners only).
+ */
+export function useClaimFromRound() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  async function claim(roundAddress: string, proposalId: number, asset: any, proof: `0x${string}`[]) {
+    setError(null);
+    try {
+      const tx = await writeContractAsync({
+        address: roundAddress as Address,
+        abi: TIMED_ROUND_ABI,
+        functionName: 'claim',
+        args: [BigInt(proposalId), 0n, asset, proof],
+      });
+      return tx;
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { claim, isPending, error };
+}
+
+/**
  * Issue a creator pass to an address (only callable by house owner).
  */
 export function useIssueCreatorPass() {

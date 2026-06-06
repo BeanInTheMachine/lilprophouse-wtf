@@ -3,9 +3,12 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
-import { useCancelRound, useFinalizeRound, useClaimAward, useRoundChainState } from '@/lib/hooks/useOnChain';
+import { useCancelRound, useFinalizeRound, useClaimAward, useRoundChainState, useDepositToRound } from '@/lib/hooks/useOnChain';
+import { useBalance } from 'wagmi';
+import { type Address } from 'viem';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import InputFormGroup from '@/components/ui/InputFormGroup';
 import LoadingIndicator from '@/components/ui/LoadingIndicator';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -20,6 +23,13 @@ export default function RoundManagerPage() {
 
   const { cancelRound, isPending: cancelling } = useCancelRound();
   const { finalizeRound, isPending: finalizing } = useFinalizeRound();
+  const { depositEth, isPending: depositing } = useDepositToRound();
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositStatus, setDepositStatus] = useState('');
+
+  const { data: roundBalance } = useBalance({
+    address: round?.contractAddress as Address | undefined,
+  });
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
   const [actionError, setActionError] = useState('');
   const [actionLabel, setActionLabel] = useState<string | null>(null);
@@ -161,10 +171,43 @@ export default function RoundManagerPage() {
         {/* Deposit */}
         <Card className="p-6">
           <h3 className="font-bold text-lg text-brand-black mb-4">Deposit Assets</h3>
-          <p className="text-sm text-brand-gray">
+          <p className="text-sm text-brand-gray mb-4">
             {round.contractAddress
-              ? `Fund this round by directly sending assets to ${round.contractAddress.slice(0, 6)}...${round.contractAddress.slice(-4)}.`
+              ? `Fund this round by depositing ETH. Current balance: ${roundBalance?.formatted ?? '0'} ${roundBalance?.symbol ?? 'ETH'}.`
               : 'Deposit assets after the round is deployed on-chain.'}
+          </p>
+
+          <div className="flex gap-3 items-end">
+            <InputFormGroup
+              label="Amount (ETH)"
+              name="deposit"
+              value={depositAmount}
+              onChange={(e) => setDepositAmount(e.target.value)}
+              placeholder="0.00"
+              className="flex-1"
+            />
+            <Button
+              onClick={async () => {
+                if (!round?.contractAddress || !depositAmount) return;
+                setDepositStatus('depositing');
+                try {
+                  await depositEth(round.contractAddress, depositAmount);
+                  setDepositStatus('sent');
+                  setDepositAmount('');
+                } catch (e: any) {
+                  setDepositStatus('');
+                }
+              }}
+              disabled={depositing || !depositAmount || !round?.contractAddress}
+            >
+              {depositing ? 'Sending...' : 'Deposit ETH'}
+            </Button>
+          </div>
+          {depositStatus === 'sent' && (
+            <p className="text-sm text-brand-green mt-3">Transaction sent. Balance will update once confirmed.</p>
+          )}
+          <p className="text-xs text-brand-gray mt-3">
+            Deposits go directly to the round contract. Anyone can fund a round.
           </p>
         </Card>
       </div>
