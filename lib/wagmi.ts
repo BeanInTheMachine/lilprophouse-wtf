@@ -9,7 +9,7 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 export const config = getDefaultConfig({
   appName: 'Lil Prop House',
   projectId: projectId ?? '',
-  chains: [mainnet, base],
+  chains: [base, mainnet],
   transports: {
     [mainnet.id]: rpcUrl ? http(rpcUrl) : http(),
     [base.id]: http(baseRpcUrl),
