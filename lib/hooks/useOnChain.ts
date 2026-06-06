@@ -159,6 +159,7 @@ export function useCreateHouseOnChain() {
         abi: HOUSE_REGISTRY_ABI,
         functionName: 'createHouse',
         args: [name, description, imageURI],
+        chainId: 8453,
       });
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
@@ -187,6 +188,7 @@ export function useCreateRoundOnChain() {
         abi: LIL_ROUND_ABI,
         bytecode: LilRoundArtifact.bytecode.object as `0x${string}`,
         args: [owner, BigInt(houseId), title, description, BigInt(numWinners)],
+        chainId: 8453,
       });
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
