@@ -15,10 +15,16 @@ const nextConfig = {
         'child_process': false,
         ws: false,
       };
+      // Use ESM isows build (avoids CJS require('ws') in browser)
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        isows: 'isows/_esm/index.js',
+      };
     }
     config.externals.push({
       'utf-8-validate': 'commonjs utf-8-validate',
       bufferutil: 'commonjs bufferutil',
+      ws: 'commonjs ws',
     });
     return config;
   },
