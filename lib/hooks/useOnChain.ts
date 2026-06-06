@@ -1,10 +1,11 @@
 'use client';
 
-import { useAccount, useWriteContract, useReadContract } from 'wagmi';
+import { useAccount, useWriteContract, useReadContract, useDeployContract } from 'wagmi';
 import { type Address, encodeAbiParameters } from 'viem';
 import { useState } from 'react';
 import { HOUSE_REGISTRY_ABI, LIL_ROUND_ABI } from '@/lib/contracts/abis';
 import { HOUSE_REGISTRY_ADDRESS } from '@/lib/contracts/addresses';
+import LilRoundArtifact from '@/contracts/out/LilRound.sol/LilRound.json';
 
 /* ============================================
    READ HOOKS
@@ -170,7 +171,7 @@ export function useCreateHouseOnChain() {
 
 /** Deploy a new LilRound contract */
 export function useCreateRoundOnChain() {
-  const { writeContractAsync, isPending } = useWriteContract();
+  const { deployContractAsync, isPending } = useDeployContract();
   const [error, setError] = useState<string | null>(null);
 
   async function createRound(
@@ -182,11 +183,11 @@ export function useCreateRoundOnChain() {
   ) {
     setError(null);
     try {
-      return await writeContractAsync({
+      return await deployContractAsync({
         abi: LIL_ROUND_ABI,
-        functionName: 'constructor',
+        bytecode: LilRoundArtifact.bytecode.object as `0x${string}`,
         args: [owner, BigInt(houseId), title, description, BigInt(numWinners)],
-      } as any);
+      });
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
       throw e;
