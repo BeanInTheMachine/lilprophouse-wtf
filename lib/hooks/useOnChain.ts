@@ -1,147 +1,164 @@
 'use client';
 
 import { useAccount, useWriteContract, useReadContract } from 'wagmi';
-import { type Address, parseAbi, encodeAbiParameters } from 'viem';
+import { type Address, encodeAbiParameters } from 'viem';
 import { useState } from 'react';
-import { post } from '@/lib/api-client';
-import {
-  PROP_HOUSE_ABI,
-  TIMED_ROUND_ABI,
-  INFINITE_ROUND_ABI,
-  COMMUNITY_HOUSE_ABI,
-  CREATOR_PASS_ISSUER_ABI,
-} from '@/lib/contracts/abis';
-import {
-  PROP_HOUSE_ADDRESS,
-  COMMUNITY_HOUSE_IMPL,
-  TIMED_ROUND_IMPL,
-  CREATOR_PASS_ISSUER_ADDRESS,
-} from '@/lib/contracts/addresses';
+import { HOUSE_REGISTRY_ABI, LIL_ROUND_ABI } from '@/lib/contracts/abis';
+import { HOUSE_REGISTRY_ADDRESS } from '@/lib/contracts/addresses';
 
-/**
- * Fetch on-chain houses for the connected wallet.
- */
+/* ============================================
+   READ HOOKS
+   ============================================ */
+
+/** Get on-chain house IDs for the connected wallet */
 export function useHousesOnChain() {
   const { address } = useAccount();
 
   const { data, isLoading } = useReadContract({
-    address: PROP_HOUSE_ADDRESS,
-    abi: PROP_HOUSE_ABI,
+    address: HOUSE_REGISTRY_ADDRESS as Address | undefined,
+    abi: HOUSE_REGISTRY_ABI,
     functionName: 'getHousesForAccount',
     args: address ? [address] : undefined,
-    query: { enabled: !!address },
+    query: { enabled: !!address && !!HOUSE_REGISTRY_ADDRESS },
   });
 
   return {
-    houses: data as `0x${string}`[] | undefined,
+    houseIds: (data as bigint[] | undefined)?.map(Number),
     loading: isLoading,
-    error: null,
   };
 }
 
-/**
- * Fetch on-chain rounds for a given house.
- */
-export function useRoundsOnChain(houseAddress?: string) {
+/** Get a single house's on-chain metadata */
+export function useHouseOnChain(houseId?: number) {
   const { data, isLoading } = useReadContract({
-    address: PROP_HOUSE_ADDRESS,
-    abi: PROP_HOUSE_ABI,
-    functionName: 'getRoundsForHouse',
-    args: houseAddress ? [houseAddress as Address] : undefined,
-    query: { enabled: !!houseAddress },
+    address: HOUSE_REGISTRY_ADDRESS as Address | undefined,
+    abi: HOUSE_REGISTRY_ABI,
+    functionName: 'getHouse',
+    args: houseId !== undefined ? [BigInt(houseId)] : undefined,
+    query: { enabled: houseId !== undefined && !!HOUSE_REGISTRY_ADDRESS },
   });
 
+  const house = data as { owner: string; name: string; description: string; imageURI: string; createdAt: bigint; roundCount: bigint } | undefined;
+
   return {
-    rounds: data as `0x${string}`[] | undefined,
+    house,
     loading: isLoading,
-    error: null,
   };
 }
 
-/**
- * Fetch on-chain house metadata.
- */
-export function useHouseMetadata(houseAddress?: string) {
+/** Read all proposals from a LilRound contract */
+export function useProposalsOnChain(roundAddress?: string) {
   const { data, isLoading } = useReadContract({
-    address: houseAddress as Address | undefined,
-    abi: COMMUNITY_HOUSE_ABI,
-    functionName: 'name',
-    query: { enabled: !!houseAddress },
-  });
-
-  const { data: description } = useReadContract({
-    address: houseAddress as Address | undefined,
-    abi: COMMUNITY_HOUSE_ABI,
-    functionName: 'description',
-    query: { enabled: !!houseAddress },
+    address: roundAddress as Address | undefined,
+    abi: LIL_ROUND_ABI,
+    functionName: 'getAllProposals',
+    query: { enabled: !!roundAddress },
   });
 
   return {
-    name: data as string | undefined,
-    description: description as string | undefined,
+    proposals: data as any[] | undefined,
     loading: isLoading,
   };
 }
 
-/**
- * Fetch on-chain round state from a TimedRound or InfiniteRound contract.
- */
+/** Read a single proposal from a LilRound contract */
+export function useProposalOnChain(roundAddress?: string, proposalId?: number) {
+  const { data, isLoading } = useReadContract({
+    address: roundAddress as Address | undefined,
+    abi: LIL_ROUND_ABI,
+    functionName: 'getProposal',
+    args: proposalId !== undefined ? [BigInt(proposalId)] : undefined,
+    query: { enabled: !!roundAddress && proposalId !== undefined },
+  });
+
+  return {
+    proposal: data as any | undefined,
+    loading: isLoading,
+  };
+}
+
+/** Check if a voter has voted on a proposal */
+export function useHasVotedOn(roundAddress?: string, proposalId?: number, voter?: string) {
+  const { data, isLoading } = useReadContract({
+    address: roundAddress as Address | undefined,
+    abi: LIL_ROUND_ABI,
+    functionName: 'hasVotedOn',
+    args: voter && proposalId !== undefined ? [voter as Address, BigInt(proposalId)] : undefined,
+    query: { enabled: !!roundAddress && proposalId !== undefined && !!voter },
+  });
+
+  return {
+    hasVoted: (data as boolean) ?? false,
+    loading: isLoading,
+  };
+}
+
+/** Read round state from LilRound contract */
 export function useRoundChainState(roundAddress?: string) {
   const { data: state } = useReadContract({
     address: roundAddress as Address | undefined,
-    abi: TIMED_ROUND_ABI,
+    abi: LIL_ROUND_ABI,
     functionName: 'state',
     query: { enabled: !!roundAddress },
   });
 
   const { data: owner } = useReadContract({
     address: roundAddress as Address | undefined,
-    abi: TIMED_ROUND_ABI,
+    abi: LIL_ROUND_ABI,
     functionName: 'owner',
     query: { enabled: !!roundAddress },
   });
 
-  const { data: proposalCount } = useReadContract({
+  const { data: totalDeposited } = useReadContract({
     address: roundAddress as Address | undefined,
-    abi: TIMED_ROUND_ABI,
-    functionName: 'proposalCount',
+    abi: LIL_ROUND_ABI,
+    functionName: 'totalDeposited',
+    query: { enabled: !!roundAddress },
+  });
+
+  const { data: numWinners } = useReadContract({
+    address: roundAddress as Address | undefined,
+    abi: LIL_ROUND_ABI,
+    functionName: 'numWinners',
+    query: { enabled: !!roundAddress },
+  });
+
+  const { data: roundTitle } = useReadContract({
+    address: roundAddress as Address | undefined,
+    abi: LIL_ROUND_ABI,
+    functionName: 'title',
     query: { enabled: !!roundAddress },
   });
 
   return {
     state: state as number | undefined,
     owner: owner as string | undefined,
-    proposalCount: proposalCount as bigint | undefined,
+    totalDeposited: totalDeposited as bigint | undefined,
+    numWinners: numWinners as bigint | undefined,
+    title: roundTitle as string | undefined,
     loading: false,
   };
 }
 
-/**
- * Deploy a new community house on-chain via the PropHouse factory.
- */
+/* ============================================
+   WRITE HOOKS
+   ============================================ */
+
+/** Deploy a new house on Base via HouseRegistry.createHouse */
 export function useCreateHouseOnChain() {
   const { writeContractAsync, isPending } = useWriteContract();
   const [error, setError] = useState<string | null>(null);
 
   async function createHouse(name: string, description: string, imageURI: string) {
     setError(null);
+    if (!HOUSE_REGISTRY_ADDRESS) throw new Error('HouseRegistry not deployed');
     try {
-      if (process.env.NEXT_PUBLIC_SKIP_ONCHAIN === 'true') {
-        return `0x${'0'.repeat(64)}` as `0x${string}`;
-      }
-
-      const config = encodeAbiParameters(
-        [{ type: 'string' }, { type: 'string' }, { type: 'string' }],
-        [name, description, imageURI],
-      );
-
-      const tx = await writeContractAsync({
-        address: PROP_HOUSE_ADDRESS,
-        abi: PROP_HOUSE_ABI,
+      return await writeContractAsync({
+        address: HOUSE_REGISTRY_ADDRESS,
+        abi: HOUSE_REGISTRY_ABI,
         functionName: 'createHouse',
-        args: [{ impl: COMMUNITY_HOUSE_IMPL, config }],
+        args: [name, description, imageURI],
       });
-      return tx;
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
       throw e;
@@ -151,160 +168,87 @@ export function useCreateHouseOnChain() {
   return { createHouse, isPending, error };
 }
 
-/**
- * Deploy a new timed round on an existing house.
- */
-export function useCreateTimedRoundOnChain() {
+/** Deploy a new LilRound contract */
+export function useCreateRoundOnChain() {
   const { writeContractAsync, isPending } = useWriteContract();
   const [error, setError] = useState<string | null>(null);
 
-  async function createTimedRound(
-    houseAddress: string,
+  async function createRound(
+    owner: string,
+    houseId: number,
     title: string,
     description: string,
-    proposalPeriodStartTimestamp: number,
-    proposalPeriodDurationSecs: number,
-    votePeriodDurationSecs: number,
     numWinners: number,
   ) {
     setError(null);
     try {
-      if (process.env.NEXT_PUBLIC_SKIP_ONCHAIN === 'true') {
-        return `0x${'0'.repeat(64)}` as `0x${string}`;
-      }
-      const roundConfig = encodeAbiParameters(
-        [
-          { type: 'uint256' },
-          { type: 'uint256' },
-          { type: 'uint256' },
-          { type: 'uint256' },
-        ],
-        [BigInt(proposalPeriodStartTimestamp), BigInt(proposalPeriodDurationSecs), BigInt(votePeriodDurationSecs), BigInt(numWinners)],
-      );
-
-      const tx = await writeContractAsync({
-        address: PROP_HOUSE_ADDRESS,
-        abi: PROP_HOUSE_ABI,
-        functionName: 'createRoundOnExistingHouse',
-        args: [
-          houseAddress as Address,
-          {
-            impl: TIMED_ROUND_IMPL,
-            config: roundConfig,
-            title,
-            description,
-          },
-        ],
-      });
-      return tx;
+      return await writeContractAsync({
+        abi: LIL_ROUND_ABI,
+        functionName: 'constructor',
+        args: [owner, BigInt(houseId), title, description, BigInt(numWinners)],
+      } as any);
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
       throw e;
     }
   }
 
-  return { createTimedRound, isPending, error };
+  return { createRound, isPending, error };
 }
 
-/**
- * Cancel a round (only callable by round owner).
- */
-export function useCancelRound() {
+/** Submit a proposal on-chain via LilRound.propose */
+export function useProposeOnChain() {
   const { writeContractAsync, isPending } = useWriteContract();
   const [error, setError] = useState<string | null>(null);
 
-  async function cancelRound(roundAddress: string) {
+  async function propose(
+    roundAddress: string,
+    title: string,
+    content: string,
+    tldr: string,
+    requestedAmount: number,
+  ) {
     setError(null);
     try {
-      const tx = await writeContractAsync({
+      return await writeContractAsync({
         address: roundAddress as Address,
-        abi: TIMED_ROUND_ABI,
-        functionName: 'cancel',
+        abi: LIL_ROUND_ABI,
+        functionName: 'propose',
+        args: [title, content, tldr, BigInt(requestedAmount)],
       });
-      return tx;
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
       throw e;
     }
   }
 
-  return { cancelRound, isPending, error };
+  return { propose, isPending, error };
 }
 
-/**
- * Finalize a timed round (anyone can call after voting ends).
- */
-export function useFinalizeRound() {
+/** Cast a vote on-chain via LilRound.vote */
+export function useVoteOnChain() {
   const { writeContractAsync, isPending } = useWriteContract();
   const [error, setError] = useState<string | null>(null);
 
-  async function finalizeRound(roundAddress: string) {
+  async function vote(roundAddress: string, proposalId: number, weight: number, isFor: boolean) {
     setError(null);
     try {
-      const tx = await writeContractAsync({
+      return await writeContractAsync({
         address: roundAddress as Address,
-        abi: TIMED_ROUND_ABI,
-        functionName: 'finalize',
+        abi: LIL_ROUND_ABI,
+        functionName: 'vote',
+        args: [BigInt(proposalId), BigInt(weight), isFor],
       });
-      return tx;
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
       throw e;
     }
   }
 
-  return { finalizeRound, isPending, error };
+  return { vote, isPending, error };
 }
 
-/**
- * Claim an award for a winning proposal.
- */
-export function useClaimAward() {
-  const { writeContractAsync, isPending } = useWriteContract();
-  const [error, setError] = useState<string | null>(null);
-
-  async function claimAward(roundAddress: string, proposalId: number) {
-    setError(null);
-    try {
-      const tx = await writeContractAsync({
-        address: roundAddress as Address,
-        abi: TIMED_ROUND_ABI,
-        functionName: 'claim',
-        args: [BigInt(proposalId)],
-      });
-      return tx;
-    } catch (e: any) {
-      setError(e.message ?? 'Transaction failed');
-      throw e;
-    }
-  }
-
-  return { claimAward, isPending, error };
-}
-
-/**
- * Check if the connected wallet holds a creator pass for a given house.
- */
-export function useHasCreatorPass(houseId?: number) {
-  const { address } = useAccount();
-
-  const { data, isLoading } = useReadContract({
-    address: CREATOR_PASS_ISSUER_ADDRESS,
-    abi: CREATOR_PASS_ISSUER_ABI,
-    functionName: 'balanceOf',
-    args: address && houseId !== undefined ? [address as Address, BigInt(houseId)] : undefined,
-    query: { enabled: !!address && houseId !== undefined },
-  });
-
-  return {
-    hasPass: data ? (data as bigint) > BigInt(0) : false,
-    loading: isLoading,
-  };
-}
-
-/**
- * Deposit ETH into a round contract via PropHouse.depositTo.
- */
+/** Deposit ETH into a round via LilRound.deposit */
 export function useDepositToRound() {
   const { writeContractAsync, isPending } = useWriteContract();
   const [error, setError] = useState<string | null>(null);
@@ -313,21 +257,13 @@ export function useDepositToRound() {
     setError(null);
     try {
       const amountWei = BigInt(Math.floor(parseFloat(amountEth) * 1e18));
-      const asset = {
-        assetType: 0, // ETH
-        assetAddress: '0x0000000000000000000000000000000000000000' as Address,
-        amount: amountWei,
-        tokenId: 0n,
-      };
-
-      const tx = await writeContractAsync({
-        address: PROP_HOUSE_ADDRESS,
-        abi: PROP_HOUSE_ABI,
-        functionName: 'depositTo',
-        args: [roundAddress as Address, asset],
+      return await writeContractAsync({
+        address: roundAddress as Address,
+        abi: LIL_ROUND_ABI,
+        functionName: 'deposit',
+        args: [],
         value: amountWei,
       });
-      return tx;
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
       throw e;
@@ -337,54 +273,96 @@ export function useDepositToRound() {
   return { depositEth, isPending, error };
 }
 
-/**
- * Claim an award from a round contract (winners only).
- */
-export function useClaimFromRound() {
+/** Set winners on a LilRound (owner only) */
+export function useSetWinners() {
   const { writeContractAsync, isPending } = useWriteContract();
   const [error, setError] = useState<string | null>(null);
 
-  async function claim(roundAddress: string, proposalId: number, asset: any, proof: `0x${string}`[]) {
+  async function setWinners(
+    roundAddress: string,
+    proposalIds: number[],
+    amounts: number[],
+  ) {
     setError(null);
     try {
-      const tx = await writeContractAsync({
+      return await writeContractAsync({
         address: roundAddress as Address,
-        abi: TIMED_ROUND_ABI,
-        functionName: 'claim',
-        args: [BigInt(proposalId), 0n, asset, proof],
+        abi: LIL_ROUND_ABI,
+        functionName: 'setWinners',
+        args: [proposalIds.map((id) => BigInt(id)), amounts.map((a) => BigInt(a))],
       });
-      return tx;
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
       throw e;
     }
   }
 
-  return { claim, isPending, error };
+  return { setWinners, isPending, error };
 }
 
-/**
- * Issue a creator pass to an address (only callable by house owner).
- */
-export function useIssueCreatorPass() {
+/** Claim an award from a LilRound (winners only) */
+export function useClaimAward() {
   const { writeContractAsync, isPending } = useWriteContract();
   const [error, setError] = useState<string | null>(null);
 
-  async function issuePass(houseId: number, to: string) {
+  async function claimAward(roundAddress: string, proposalId: number) {
     setError(null);
     try {
-      const tx = await writeContractAsync({
-        address: CREATOR_PASS_ISSUER_ADDRESS,
-        abi: CREATOR_PASS_ISSUER_ABI,
-        functionName: 'safeTransferFrom',
-        args: ['0x0000000000000000000000000000000000000000' as Address, to as Address, BigInt(houseId), BigInt(1), '0x'],
+      return await writeContractAsync({
+        address: roundAddress as Address,
+        abi: LIL_ROUND_ABI,
+        functionName: 'claim',
+        args: [BigInt(proposalId)],
       });
-      return tx;
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
       throw e;
     }
   }
 
-  return { issuePass, isPending, error };
+  return { claimAward, isPending, error };
+}
+
+/** Cancel a LilRound (owner only) */
+export function useCancelRound() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  async function cancelRound(roundAddress: string) {
+    setError(null);
+    try {
+      return await writeContractAsync({
+        address: roundAddress as Address,
+        abi: LIL_ROUND_ABI,
+        functionName: 'cancel',
+      });
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { cancelRound, isPending, error };
+}
+
+/** Open voting phase on a LilRound (owner only) */
+export function useOpenVoting() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  async function openVoting(roundAddress: string) {
+    setError(null);
+    try {
+      return await writeContractAsync({
+        address: roundAddress as Address,
+        abi: LIL_ROUND_ABI,
+        functionName: 'openVoting',
+      });
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { openVoting, isPending, error };
 }

@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useAccount } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
-import { useRoundChainState } from '@/lib/hooks/useOnChain';
+import { useRoundChainState, useVoteOnChain } from '@/lib/hooks/useOnChain';
 import StatusPill from '@/components/ui/StatusPill';
 import Link from 'next/link';
 import dayjs from 'dayjs';
@@ -45,7 +47,10 @@ export default function RoundPage() {
   const params = useParams<{ roundId: string }>();
   const roundId = parseInt(params.roundId, 10);
   const { data: round, loading, error } = useRound(roundId);
+  const { address: wallet } = useAccount();
   const { state: chainState, owner: chainOwner } = useRoundChainState(round?.contractAddress ?? undefined);
+  const { vote, isPending: voting } = useVoteOnChain();
+  const [votingPropId, setVotingPropId] = useState<number | null>(null);
 
   if (loading) {
     return (
@@ -163,7 +168,7 @@ export default function RoundPage() {
           </h2>
           {isAccepting && (
             <Link
-              href={`/create/proposal?round=${round.id}`}
+              href={`/create/proposal?round=${round.id}${round.contractAddress ? `&address=${round.contractAddress}` : ''}`}
               className="inline-flex items-center justify-center rounded-[10px] px-3 py-1.5 text-sm font-bold text-white bg-brand-purple hover:bg-brand-purple-transparent transition-colors no-underline"
             >
               Submit proposal

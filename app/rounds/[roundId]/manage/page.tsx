@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
-import { useCancelRound, useFinalizeRound, useClaimAward, useRoundChainState, useDepositToRound } from '@/lib/hooks/useOnChain';
+import { useCancelRound, useRoundChainState, useDepositToRound, useSetWinners, useOpenVoting } from '@/lib/hooks/useOnChain';
 import { useBalance } from 'wagmi';
 import { type Address } from 'viem';
 import Button from '@/components/ui/Button';
@@ -22,7 +22,8 @@ export default function RoundManagerPage() {
   const { state: chainState, owner: chainOwner } = useRoundChainState(round?.contractAddress ?? undefined);
 
   const { cancelRound, isPending: cancelling } = useCancelRound();
-  const { finalizeRound, isPending: finalizing } = useFinalizeRound();
+  const { setWinners, isPending: settingWinners } = useSetWinners();
+  const { openVoting, isPending: openingVoting } = useOpenVoting();
   const { depositEth, isPending: depositing } = useDepositToRound();
   const [depositAmount, setDepositAmount] = useState('');
   const [depositStatus, setDepositStatus] = useState('');
@@ -75,16 +76,15 @@ export default function RoundManagerPage() {
     setActionLabel('finalize');
     setActionError('');
     try {
-      const hash = await finalizeRound(round.contractAddress);
+      const hash = await setWinners(round.contractAddress, [], []);
       setTxHash(hash);
-      router.push(`/rounds/${roundId}`);
     } catch (e: any) {
       setActionError(e.message ?? 'Failed to finalize round');
       setActionLabel(null);
     }
   }
 
-  const isBusy = cancelling || finalizing || waiting;
+  const isBusy = cancelling || settingWinners || openingVoting || waiting;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">

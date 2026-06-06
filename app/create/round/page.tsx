@@ -6,7 +6,7 @@ import { useAccount, useSignTypedData, useWaitForTransactionReceipt } from 'wagm
 import { useState, useEffect } from 'react';
 import { post } from '@/lib/api-client';
 import { DOMAIN_SEPARATOR, PROPOSAL_MESSAGE_TYPES } from '@/lib/eip712';
-import { useCreateTimedRoundOnChain } from '@/lib/hooks/useOnChain';
+import { useCreateRoundOnChain } from '@/lib/hooks/useOnChain';
 import Card from '@/components/ui/Card';
 import ConnectToContinue from '@/components/web3/ConnectToContinue';
 import StepSidebar from '@/components/round-wizard/StepSidebar';
@@ -35,7 +35,7 @@ export default function CreateRoundPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
   const { signTypedDataAsync } = useSignTypedData();
-  const { createTimedRound, isPending: isDeploying } = useCreateTimedRoundOnChain();
+  const { createRound, isPending: isDeploying } = useCreateRoundOnChain();
   const { data: receipt } = useWaitForTransactionReceipt({ hash: txHash ?? undefined });
 
   function handleSelectHouse(house: HouseInfo) {
@@ -48,13 +48,11 @@ export default function CreateRoundPage() {
 
     try {
       // Deploy round on-chain (or skip if NEXT_PUBLIC_SKIP_ONCHAIN=true)
-      const hash = await createTimedRound(
-        round.house.address,
+      const hash = await createRound(
+        address,
+        round.house.id,
         round.title,
         round.description || '',
-        round.proposalPeriodStartUnixTimestamp,
-        round.proposalPeriodDurationSecs,
-        round.votePeriodDurationSecs,
         round.numWinners,
       );
       setTxHash(hash);

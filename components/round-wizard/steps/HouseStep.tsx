@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { useHouses } from '@/lib/hooks/useApi';
-import { useHousesOnChain, useHouseMetadata, useCreateHouseOnChain } from '@/lib/hooks/useOnChain';
+import { useHousesOnChain, useHouseOnChain, useCreateHouseOnChain } from '@/lib/hooks/useOnChain';
 import Card from '@/components/ui/Card';
 import InputFormGroup from '@/components/ui/InputFormGroup';
 import Button from '@/components/ui/Button';
@@ -33,7 +33,7 @@ interface MergedHouse {
 export default function HouseStep({ onSelectHouse }: HouseStepProps) {
   const { address, isConnected } = useAccount();
   const { data: dbHouses, loading: dbLoading, error: dbError } = useHouses();
-  const { houses: chainAddresses, loading: chainLoading } = useHousesOnChain();
+  const { houseIds: chainHouseIds, loading: chainLoading } = useHousesOnChain();
 
   const [showNewHouseForm, setShowNewHouseForm] = useState(false);
   const [newName, setNewName] = useState('');
@@ -168,9 +168,8 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
     }
 
     // Add on-chain houses, merging with existing DB entries
-    for (const addr of chainAddresses ?? []) {
-      if (!addr || !isAddress(addr)) continue;
-      const key = addr.toLowerCase();
+    for (const houseId of chainHouseIds ?? []) {
+      const key = String(houseId);
       const existing = map.get(key);
 
       if (existing) {
@@ -178,8 +177,8 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
       } else {
         // On-chain house without DB record — show with loading metadata
         map.set(key, {
-          id: 0,
-          address: addr,
+          id: houseId,
+          address: String(houseId),
           name: '(Loading...)',
           image: '',
           description: '',
@@ -193,7 +192,7 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
     }
 
     return Array.from(map.values());
-  }, [dbHouses, chainAddresses]);
+  }, [dbHouses, chainHouseIds]);
 
   const hasHouse = mergedHouses.length > 0;
 
@@ -270,13 +269,10 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
 }
 
 function MergedHouseCard({ house, onSelect }: { house: MergedHouse; onSelect: (h: HouseInfo) => void }) {
-  const { name: chainName, description: chainDesc, loading: metaLoading } = useHouseMetadata(
-    house.source !== 'db' ? house.address : undefined,
-  );
+  const { house: chainHouse } = useHouseOnChain(house.source !== 'db' ? house.id : undefined);
 
-  const name = house.name === '(Loading...)' ? (chainName ?? house.name) : house.name;
-  const description = chainDesc ?? house.description;
-  const isLoading = house.loading && metaLoading;
+  const name = house.name === '(Loading...)' ? (chainHouse?.name ?? house.name) : house.name;
+  const description = chainHouse?.description ?? house.description;
 
   return (
     <Card
@@ -305,7 +301,7 @@ function MergedHouseCard({ house, onSelect }: { house: MergedHouse; onSelect: (h
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="font-bold text-sm text-brand-black truncate">
-            {isLoading ? 'Loading...' : name}
+            {house.loading ? 'Loading...' : name}
           </p>
           {house.source === 'chain' && (
             <span className="text-xs px-1.5 py-0.5 rounded-full bg-brand-purple-hint text-brand-purple font-medium flex-shrink-0">

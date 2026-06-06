@@ -22,15 +22,21 @@ export {
 } from './useWeb3';
 
 export {
+  // Read hooks
   useHousesOnChain,
-  useRoundsOnChain,
-  useHouseMetadata,
+  useHouseOnChain,
+  useProposalsOnChain,
+  useProposalOnChain,
+  useHasVotedOn,
   useRoundChainState,
+  // Write hooks
   useCreateHouseOnChain,
-  useCreateTimedRoundOnChain,
-  useCancelRound,
-  useFinalizeRound,
+  useCreateRoundOnChain,
+  useProposeOnChain,
+  useVoteOnChain,
+  useDepositToRound,
+  useSetWinners,
   useClaimAward,
-  useHasCreatorPass,
-  useIssueCreatorPass,
+  useCancelRound,
+  useOpenVoting,
 } from './useOnChain';
