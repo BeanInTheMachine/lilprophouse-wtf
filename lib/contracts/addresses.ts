@@ -1,11 +1,4 @@
-export const PROP_HOUSE_ADDRESS = (process.env.NEXT_PUBLIC_PROP_HOUSE_ADDRESS ??
-  '0x000000002C93CAD6F9cFD00C603aEf62458d8A48') as `0x${string}`;
+export const HOUSE_REGISTRY_ADDRESS = (process.env.NEXT_PUBLIC_HOUSE_REGISTRY_ADDRESS ??
+  '') as `0x${string}`;
 
-export const COMMUNITY_HOUSE_IMPL = (process.env.NEXT_PUBLIC_COMMUNITY_HOUSE_IMPL ??
-  '0x92eE1cCdf3AA2E39E3F519B95fee2A601A28663D') as `0x${string}`;
-
-export const TIMED_ROUND_IMPL = (process.env.NEXT_PUBLIC_TIMED_ROUND_IMPL ??
-  '0x43c015Df7f3868B287ad94D88b1E05F596BBa453') as `0x${string}`;
-
-export const CREATOR_PASS_ISSUER_ADDRESS = (process.env.NEXT_PUBLIC_CREATOR_PASS_ISSUER_ADDRESS ??
-  '0x392d429Dfa457C216C35fc6EBaf34c42de4aEAB5') as `0x${string}`;
+export const BASE_RPC_URL = process.env.NEXT_PUBLIC_BASE_RPC_URL ?? 'https://mainnet.base.org';
