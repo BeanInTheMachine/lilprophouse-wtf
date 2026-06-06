@@ -13,6 +13,7 @@ const nextConfig = {
         tls: false,
         'pino-pretty': false,
         'child_process': false,
+        ws: false,
       };
     }
     config.externals.push({
