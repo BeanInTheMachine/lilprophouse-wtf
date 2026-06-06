@@ -1,7 +1,8 @@
 'use client';
 
-import { useAccount, useWriteContract, useReadContract, useDeployContract } from 'wagmi';
+import { useAccount, useChainId, useSwitchChain, useWriteContract, useReadContract, useDeployContract } from 'wagmi';
 import { type Address, encodeAbiParameters } from 'viem';
+import { base } from 'wagmi/chains';
 import { useState } from 'react';
 import { HOUSE_REGISTRY_ABI, LIL_ROUND_ABI } from '@/lib/contracts/abis';
 import { HOUSE_REGISTRY_ADDRESS } from '@/lib/contracts/addresses';
@@ -148,18 +149,20 @@ export function useRoundChainState(roundAddress?: string) {
 /** Deploy a new house on Base via HouseRegistry.createHouse */
 export function useCreateHouseOnChain() {
   const { writeContractAsync, isPending } = useWriteContract();
+  const chainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
   const [error, setError] = useState<string | null>(null);
 
   async function createHouse(name: string, description: string, imageURI: string) {
     setError(null);
     if (!HOUSE_REGISTRY_ADDRESS) throw new Error('HouseRegistry not deployed');
+    if (chainId !== base.id) await switchChainAsync({ chainId: base.id });
     try {
       return await writeContractAsync({
         address: HOUSE_REGISTRY_ADDRESS,
         abi: HOUSE_REGISTRY_ABI,
         functionName: 'createHouse',
         args: [name, description, imageURI],
-        chainId: 8453,
       });
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
@@ -173,6 +176,8 @@ export function useCreateHouseOnChain() {
 /** Deploy a new LilRound contract */
 export function useCreateRoundOnChain() {
   const { deployContractAsync, isPending } = useDeployContract();
+  const chainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
   const [error, setError] = useState<string | null>(null);
 
   async function createRound(
@@ -183,12 +188,12 @@ export function useCreateRoundOnChain() {
     numWinners: number,
   ) {
     setError(null);
+    if (chainId !== base.id) await switchChainAsync({ chainId: base.id });
     try {
       return await deployContractAsync({
         abi: LIL_ROUND_ABI,
         bytecode: LilRoundArtifact.bytecode.object as `0x${string}`,
         args: [owner, BigInt(houseId), title, description, BigInt(numWinners)],
-        chainId: 8453,
       });
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
