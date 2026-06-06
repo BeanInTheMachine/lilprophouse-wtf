@@ -2,6 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useRound } from '@/lib/hooks/useApi';
+import { useRoundChainState } from '@/lib/hooks/useOnChain';
 import StatusPill from '@/components/ui/StatusPill';
 import Link from 'next/link';
 import dayjs from 'dayjs';
@@ -44,6 +45,7 @@ export default function RoundPage() {
   const params = useParams<{ roundId: string }>();
   const roundId = parseInt(params.roundId, 10);
   const { data: round, loading, error } = useRound(roundId);
+  const { state: chainState, owner: chainOwner } = useRoundChainState(round?.contractAddress ?? undefined);
 
   if (loading) {
     return (

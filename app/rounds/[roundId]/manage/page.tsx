@@ -1,21 +1,30 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
+import { useCancelRound, useFinalizeRound, useClaimAward, useRoundChainState } from '@/lib/hooks/useOnChain';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import LoadingIndicator from '@/components/ui/LoadingIndicator';
 import Link from 'next/link';
 import { useState } from 'react';
-import { post } from '@/lib/api-client';
 
 export default function RoundManagerPage() {
   const params = useParams<{ roundId: string }>();
   const roundId = parseInt(params.roundId, 10);
   const router = useRouter();
+  const { address } = useAccount();
   const { data: round, loading, error: fetchError } = useRound(roundId);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const { state: chainState, owner: chainOwner } = useRoundChainState(round?.contractAddress ?? undefined);
+
+  const { cancelRound, isPending: cancelling } = useCancelRound();
+  const { finalizeRound, isPending: finalizing } = useFinalizeRound();
+  const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
   const [actionError, setActionError] = useState('');
+  const [actionLabel, setActionLabel] = useState<string | null>(null);
+
+  const { isLoading: waiting } = useWaitForTransactionReceipt({ hash: txHash ?? undefined });
 
   if (loading) return <LoadingIndicator />;
   if (fetchError || !round) {
@@ -27,33 +36,45 @@ export default function RoundManagerPage() {
     );
   }
 
+  const isOwner = chainOwner ? chainOwner.toLowerCase() === address?.toLowerCase() : true;
+
   async function handleCancel() {
     if (!confirm('Are you sure you want to cancel this round? This cannot be undone.')) return;
-    setActionLoading('cancel');
+    if (!round?.contractAddress) {
+      setActionError('Round not deployed on-chain');
+      return;
+    }
+    setActionLabel('cancel');
     setActionError('');
     try {
-      await post(`/api/rounds/${roundId}/cancel`, {});
+      const hash = await cancelRound(round.contractAddress);
+      setTxHash(hash);
       router.push(`/rounds/${roundId}`);
     } catch (e: any) {
       setActionError(e.message ?? 'Failed to cancel round');
-    } finally {
-      setActionLoading(null);
+      setActionLabel(null);
     }
   }
 
   async function handleFinalize() {
     if (!confirm('Finalize this round? Winners will be selected.')) return;
-    setActionLoading('finalize');
+    if (!round?.contractAddress) {
+      setActionError('Round not deployed on-chain');
+      return;
+    }
+    setActionLabel('finalize');
     setActionError('');
     try {
-      await post(`/api/rounds/${roundId}/finalize`, {});
+      const hash = await finalizeRound(round.contractAddress);
+      setTxHash(hash);
       router.push(`/rounds/${roundId}`);
     } catch (e: any) {
       setActionError(e.message ?? 'Failed to finalize round');
-    } finally {
-      setActionLoading(null);
+      setActionLabel(null);
     }
   }
+
+  const isBusy = cancelling || finalizing || waiting;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
@@ -87,25 +108,52 @@ export default function RoundManagerPage() {
                 <p className="font-bold text-brand-black">{value}</p>
               </div>
             ))}
+            {round.contractAddress && (
+              <div className="col-span-2">
+                <span className="text-brand-gray">Contract</span>
+                <p className="font-bold text-brand-black font-mono text-xs break-all">{round.contractAddress}</p>
+              </div>
+            )}
           </div>
         </Card>
+
+        {/* On-chain state */}
+        {round.contractAddress && chainState !== undefined && (
+          <Card className="p-6">
+            <h3 className="font-bold text-lg text-brand-black mb-4">On-Chain State</h3>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {[
+                ['State', String(chainState)],
+                ['Owner', chainOwner ? `${chainOwner.slice(0, 6)}...${chainOwner.slice(-4)}` : 'Unknown'],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <span className="text-brand-gray">{label}</span>
+                  <p className="font-bold text-brand-black">{value}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* Actions */}
         <Card className="p-6">
           <h3 className="font-bold text-lg text-brand-black mb-4">Actions</h3>
           <div className="flex flex-col gap-3">
             {(round.state === 'ACCEPTING_PROPOSALS' || round.state === 'VOTING') && (
-              <Button variant="outline" onClick={handleCancel} disabled={actionLoading !== null} className="border-brand-red text-brand-red hover:bg-brand-red-hint">
-                {actionLoading === 'cancel' ? 'Cancelling...' : 'Cancel Round'}
+              <Button variant="outline" onClick={handleCancel} disabled={isBusy} className="border-brand-red text-brand-red hover:bg-brand-red-hint">
+                {actionLabel === 'cancel' && waiting ? 'Confirming...' : actionLabel === 'cancel' ? 'Signing...' : 'Cancel Round'}
               </Button>
             )}
-            {round.state === 'VOTING' && (
-              <Button onClick={handleFinalize} disabled={actionLoading !== null}>
-                {actionLoading === 'finalize' ? 'Finalizing...' : 'Finalize Round'}
+            {(round.state === 'VOTING' || round.state === 'COMPLETED') && (
+              <Button onClick={handleFinalize} disabled={isBusy}>
+                {actionLabel === 'finalize' && waiting ? 'Confirming...' : actionLabel === 'finalize' ? 'Signing...' : 'Finalize Round'}
               </Button>
             )}
             {(round.state === 'COMPLETED' || round.state === 'CANCELLED') && (
-              <p className="text-sm text-brand-gray text-center py-2">No actions available for {round.state.toLowerCase()} rounds.</p>
+              <p className="text-sm text-brand-gray text-center py-2">No actions available for completed or cancelled rounds.</p>
+            )}
+            {!isOwner && (
+              <p className="text-xs text-brand-gray text-center">Only the round owner can perform actions.</p>
             )}
           </div>
         </Card>
@@ -113,8 +161,11 @@ export default function RoundManagerPage() {
         {/* Deposit */}
         <Card className="p-6">
           <h3 className="font-bold text-lg text-brand-black mb-4">Deposit Assets</h3>
-          <p className="text-sm text-brand-gray mb-4">Fund this round by depositing assets to the round contract.</p>
-          <Button disabled>Coming soon</Button>
+          <p className="text-sm text-brand-gray">
+            {round.contractAddress
+              ? `Fund this round by directly sending assets to ${round.contractAddress.slice(0, 6)}...${round.contractAddress.slice(-4)}.`
+              : 'Deposit assets after the round is deployed on-chain.'}
+          </p>
         </Card>
       </div>
     </div>
