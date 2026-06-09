@@ -13,7 +13,7 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="flex min-h-[75vh] homeHeroContent">
             <div className="w-full lg:w-8/12 pt-8 lg:pt-0 flex flex-col justify-center">
-              <h1 className="font-bold text-6xl text-brand-black">Prop House</h1>
+              <h1 className="font-bold text-6xl text-brand-black">Lil Rounds</h1>
               <p className="text-[25px] text-brand-gray mt-2 max-w-xl">
                 A simple and fun way to award people onchain. Set up a round, tell the internet and watch magic happen.
               </p>
@@ -71,7 +71,7 @@ export default function Home() {
             <div className="homeCityTitleCol lg:w-6/12 py-8 text-center lg:text-left">
               <h2 className="font-bold text-[40px] text-brand-black">Born in Nouns</h2>
               <p className="text-lg text-brand-gray mt-2 max-w-md">
-                Prop House is a project born and funded by Nouns. It serves as an open invitation for all onchain communities to build the world they want to see.
+                Lil Rounds is a project born and funded by Nouns. It serves as an open invitation for all onchain communities to build the world they want to see.
               </p>
             </div>
           </div>
@@ -92,7 +92,7 @@ export default function Home() {
               { title: 'Awards', desc: 'Use any type of asset to award builders - ETH, USDC or NFTs (and more). Anything to get the people going.' },
               { title: 'Cross pollinate', desc: 'Let builders from all corners of Ethereum build for your community.' },
               { title: 'Transparent', desc: 'Allow builders to see how winners are decided on through simple and transparent voting.' },
-              { title: 'Onchain & open source', desc: 'From round creation to award claiming — the entire Prop House stack is onchain and open source.' },
+              { title: 'Onchain & open source', desc: 'From round creation to award claiming — the entire Lil Rounds stack is onchain and open source.' },
               { title: 'Simple', desc: 'Enjoy an intuitive interface that makes clunky crypto apps a thing of the past.' },
             ].map((feature) => (
               <div key={feature.title} className="homeFeatureItem">
@@ -119,7 +119,7 @@ export default function Home() {
       <div className="break-out bg-brand-purple homeExploreSection">
         <div className="container mx-auto px-4 text-center">
           <h2 className="font-bold text-[40px] text-white mb-2">Explore now</h2>
-          <p className="text-lg text-white/80 mb-6">Discover what&apos;s being built with Prop House</p>
+          <p className="text-lg text-white/80 mb-6">Discover what&apos;s being built with Lil Rounds</p>
           <a href="/app" className="inline-flex items-center justify-center rounded-[10px] px-3 py-1.5 text-base font-bold text-white bg-brand-pink hover:bg-brand-pink-semi-transparent transition-colors no-underline">
             Explore rounds
           </a>

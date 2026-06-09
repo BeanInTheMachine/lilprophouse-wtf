@@ -93,7 +93,7 @@ export default function DashboardPage() {
     <ConnectToContinue>
       <div className="container mx-auto px-4 py-8">
         <h1 className="font-londrina text-3xl text-brand-black mb-2">Dashboard</h1>
-        <p className="text-brand-gray mb-8">Your activity across Prop House.</p>
+        <p className="text-brand-gray mb-8">Your activity across Lil Rounds.</p>
         {address && <DashboardContent address={address} />}
       </div>
     </ConnectToContinue>

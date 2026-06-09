@@ -37,7 +37,7 @@ export default function BrowsePage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="font-londrina text-3xl text-brand-black mb-2">Browse Rounds</h1>
-      <p className="text-brand-gray mb-8">Discover funding rounds on Prop House.</p>
+      <p className="text-brand-gray mb-8">Discover funding rounds on Lil Rounds.</p>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-border-light rounded-xl p-1 mb-6 max-w-xs">

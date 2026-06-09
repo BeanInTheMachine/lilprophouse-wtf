@@ -10,8 +10,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const id = parseInt(roundId, 10);
   const round = !isNaN(id) ? await getRoundById(id) : null;
 
-  const title = round?.title ? `${round.title} — Prop House` : 'Round — Prop House';
-  const description = round?.description ?? 'A funding round on Prop House.';
+  const title = round?.title ? `${round.title} — Lil Rounds` : 'Round — Lil Rounds';
+  const description = round?.description ?? 'A funding round on Lil Rounds.';
 
   return {
     title,

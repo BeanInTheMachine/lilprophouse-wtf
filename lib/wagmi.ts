@@ -7,7 +7,7 @@ const baseRpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL ?? 'https://mainnet.base
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
 export const config = getDefaultConfig({
-  appName: 'Lil Prop House',
+  appName: 'Lil Rounds',
   projectId: projectId ?? '',
   chains: [base, mainnet],
   transports: {

@@ -9,7 +9,7 @@ export default function HousesPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="font-londrina text-3xl text-brand-black mb-2">Houses</h1>
-      <p className="text-brand-gray mb-8">Communities funding builders through Prop House.</p>
+      <p className="text-brand-gray mb-8">Communities funding builders through Lil Rounds.</p>
 
       {loading && (
         <div className="grid gap-4 sm:grid-cols-2">

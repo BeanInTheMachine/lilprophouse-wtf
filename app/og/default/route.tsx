@@ -26,7 +26,7 @@ export async function GET() {
             marginBottom: 20,
           }}
         >
-          Prop House
+          Lil Rounds
         </h1>
         <p
           style={{

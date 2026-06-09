@@ -20,20 +20,20 @@ const londrinaSolid = Londrina_Solid({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://prop.house'),
   title: {
-    default: 'Prop House',
-    template: '%s — Prop House',
+    default: 'Lil Rounds',
+    template: '%s — Lil Rounds',
   },
   description: 'A simple and fun way to award builders. Communities deploy capital through proposal auctions where the bids are ideas. Born in and funded by Nouns DAO.',
   openGraph: {
     type: 'website',
-    siteName: 'Prop House',
-    title: 'Prop House',
+    siteName: 'Lil Rounds',
+    title: 'Lil Rounds',
     description: 'A simple and fun way to award builders. Born in and funded by Nouns DAO.',
     images: ['/og/default'],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Prop House',
+    title: 'Lil Rounds',
     description: 'A simple and fun way to award builders. Born in and funded by Nouns DAO.',
     images: ['/og/default'],
   },

@@ -9,8 +9,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { address } = await params;
   const house = await getHouseByContractAddress(address);
 
-  const title = house?.name ? `${house.name} — Prop House` : 'House — Prop House';
-  const description = house?.description ?? 'A community funding builders through Prop House.';
+  const title = house?.name ? `${house.name} — Lil Rounds` : 'House — Lil Rounds';
+  const description = house?.description ?? 'A community funding builders through Lil Rounds.';
 
   return {
     title,
