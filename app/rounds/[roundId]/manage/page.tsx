@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
-import { useCancelRound, useRoundChainState, useDepositToRound, useSetWinners, useOpenVoting } from '@/lib/hooks/useOnChain';
+import { useCancelRound, useRoundChainState, useDepositToRound, useSetWinners } from '@/lib/hooks/useOnChain';
 import { useBalance } from 'wagmi';
 import { type Address } from 'viem';
 import Button from '@/components/ui/Button';
@@ -23,7 +23,6 @@ export default function RoundManagerPage() {
 
   const { cancelRound, isPending: cancelling } = useCancelRound();
   const { setWinners, isPending: settingWinners } = useSetWinners();
-  const { openVoting, isPending: openingVoting } = useOpenVoting();
   const { depositEth, isPending: depositing } = useDepositToRound();
   const [depositAmount, setDepositAmount] = useState('');
   const [depositStatus, setDepositStatus] = useState('');
@@ -47,7 +46,7 @@ export default function RoundManagerPage() {
     );
   }
 
-  const isOwner = chainOwner ? chainOwner.toLowerCase() === address?.toLowerCase() : true;
+  const isOwner = chainOwner ? chainOwner.toLowerCase() === address?.toLowerCase() : false;
 
   async function handleCancel() {
     if (!confirm('Are you sure you want to cancel this round? This cannot be undone.')) return;
@@ -84,7 +83,7 @@ export default function RoundManagerPage() {
     }
   }
 
-  const isBusy = cancelling || settingWinners || openingVoting || waiting;
+  const isBusy = cancelling || settingWinners || waiting;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">

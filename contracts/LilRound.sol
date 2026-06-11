@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 /// @title LilRound
 /// @notice Fully on-chain round contract for Lil Prop House on Base.
 ///         Proposals and votes are stored permanently on-chain.
-///         No Starknet, no merkle proofs, no cross-chain dependencies.
+///         State transitions are time-based (derived from block.timestamp vs deadlines).
 contract LilRound {
     enum State { NotStarted, AcceptingProposals, Voting, Completed, Cancelled }
 
@@ -19,15 +19,18 @@ contract LilRound {
         uint256 votesAgainst;
     }
 
-    State public state;
     address public owner;
     uint256 public houseId;
     string public title;
     string public description;
     uint256 public numWinners;
     uint256 public createdAt;
+    uint256 public proposalEndTimestamp;
+    uint256 public votingEndTimestamp;
     uint256 public completedAt;
     uint256 public totalDeposited;
+    bool public completed;
+    bool public cancelled;
 
     Proposal[] public proposals;
     mapping(uint256 => mapping(address => uint256)) public proposalVotes;   // proposalId → voter → weight
@@ -44,18 +47,21 @@ contract LilRound {
     event RoundCancelled();
 
     modifier onlyOwner() { require(msg.sender == owner, "Not owner"); _; }
-    modifier inState(State _state) { require(state == _state, "Invalid state"); _; }
 
     constructor(
         address _owner,
         uint256 _houseId,
         string memory _title,
         string memory _description,
-        uint256 _numWinners
+        uint256 _numWinners,
+        uint256 _proposalDuration,
+        uint256 _voteDuration
     ) {
         require(_owner != address(0), "Owner required");
         require(bytes(_title).length > 0, "Title required");
         require(_numWinners > 0, "Num winners > 0");
+        require(_proposalDuration > 0, "Proposal duration > 0");
+        require(_voteDuration > 0, "Vote duration > 0");
 
         owner = _owner;
         houseId = _houseId;
@@ -63,27 +69,36 @@ contract LilRound {
         description = _description;
         numWinners = _numWinners;
         createdAt = block.timestamp;
-        state = State.AcceptingProposals;
+        proposalEndTimestamp = block.timestamp + _proposalDuration;
+        votingEndTimestamp = proposalEndTimestamp + _voteDuration;
 
         emit RoundStateChanged(State.AcceptingProposals);
+    }
+
+    /// @notice Derive the current state from block.timestamp vs deadlines
+    function currentState() public view returns (State) {
+        if (cancelled) return State.Cancelled;
+        if (completed) return State.Completed;
+        if (block.timestamp >= votingEndTimestamp) return State.Voting;
+        if (block.timestamp >= proposalEndTimestamp) return State.Voting;
+        return State.AcceptingProposals;
     }
 
     // ==================== ROUND LIFECYCLE ====================
 
-    /// @notice Open the round to proposals
-    function openProposals() external onlyOwner inState(State.NotStarted) {
-        state = State.AcceptingProposals;
-        emit RoundStateChanged(State.AcceptingProposals);
+    /// @notice Cancel the round (owner only, before finalizing)
+    function cancel() external onlyOwner {
+        require(!cancelled && !completed, "Cannot cancel");
+        cancelled = true;
+        emit RoundCancelled();
+        emit RoundStateChanged(State.Cancelled);
     }
 
-    /// @notice Move the round to the voting phase
-    function openVoting() external onlyOwner inState(State.AcceptingProposals) {
-        state = State.Voting;
-        emit RoundStateChanged(State.Voting);
-    }
-
-    /// @notice Set the winners and mark the round as completed
-    function setWinners(uint256[] calldata _proposalIds, uint256[] calldata _amounts) external onlyOwner inState(State.Voting) {
+    /// @notice Set winners and finalize the round (owner only, after voting ends)
+    function setWinners(uint256[] calldata _proposalIds, uint256[] calldata _amounts) external onlyOwner {
+        require(block.timestamp >= votingEndTimestamp, "Voting still open");
+        require(!cancelled, "Round cancelled");
+        require(!completed, "Already completed");
         require(_proposalIds.length == _amounts.length, "Length mismatch");
         require(_proposalIds.length <= numWinners, "Too many winners");
 
@@ -92,19 +107,11 @@ contract LilRound {
             winnerAmounts[_proposalIds[i]] = _amounts[i];
         }
 
-        state = State.Completed;
+        completed = true;
         completedAt = block.timestamp;
 
         emit WinnersSet(_proposalIds, _amounts);
         emit RoundStateChanged(State.Completed);
-    }
-
-    /// @notice Cancel the round
-    function cancel() external onlyOwner {
-        require(state == State.AcceptingProposals || state == State.Voting, "Cannot cancel");
-        state = State.Cancelled;
-        emit RoundCancelled();
-        emit RoundStateChanged(State.Cancelled);
     }
 
     // ==================== USER ACTIONS ====================
@@ -115,7 +122,9 @@ contract LilRound {
         string calldata _content,
         string calldata _tldr,
         uint256 _requestedAmount
-    ) external inState(State.AcceptingProposals) returns (uint256) {
+    ) external returns (uint256) {
+        require(block.timestamp < proposalEndTimestamp, "Proposals closed");
+        require(!cancelled && !completed, "Round not active");
         require(bytes(_title).length > 0, "Title required");
         require(bytes(_title).length <= 128, "Title too long");
         require(bytes(_tldr).length > 0, "TLDR required");
@@ -139,7 +148,10 @@ contract LilRound {
     }
 
     /// @notice Vote on a proposal (one vote per proposal per voter)
-    function vote(uint256 _proposalId, uint256 _weight, bool _isFor) external inState(State.Voting) {
+    function vote(uint256 _proposalId, uint256 _weight, bool _isFor) external {
+        require(block.timestamp >= proposalEndTimestamp, "Voting not open");
+        require(block.timestamp < votingEndTimestamp, "Voting closed");
+        require(!cancelled && !completed, "Round not active");
         require(_proposalId < proposals.length, "Invalid proposal");
         require(_weight > 0, "Weight must be > 0");
         require(!hasVotedOn[_proposalId][msg.sender], "Already voted");
@@ -158,7 +170,7 @@ contract LilRound {
 
     /// @notice Claim an award (winners only)
     function claim(uint256 _proposalId) external {
-        require(state == State.Completed, "Round not completed");
+        require(completed, "Round not finalized");
         require(_proposalId < proposals.length, "Invalid proposal");
         require(proposals[_proposalId].proposer == msg.sender, "Not your proposal");
         require(winnerAmounts[_proposalId] > 0, "Not a winner");
@@ -178,7 +190,7 @@ contract LilRound {
 
     /// @notice Deposit ETH into the round
     function deposit() external payable {
-        require(state == State.AcceptingProposals || state == State.Voting || state == State.Completed, "Invalid state");
+        require(!cancelled && !completed, "Round finalized");
         require(msg.value > 0, "Must deposit ETH");
         totalDeposited += msg.value;
         emit DepositReceived(msg.sender, msg.value);

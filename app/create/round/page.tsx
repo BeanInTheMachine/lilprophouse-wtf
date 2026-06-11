@@ -54,6 +54,8 @@ export default function CreateRoundPage() {
         round.title,
         round.description || '',
         round.numWinners,
+        round.proposalPeriodDurationSecs,
+        round.votePeriodDurationSecs,
       );
       setTxHash(hash);
 
@@ -71,13 +73,13 @@ export default function CreateRoundPage() {
     }
   }
 
-  async function storeRoundInDb() {
+  async function storeRoundInDb(contractAddress?: string) {
     if (!address) return;
 
     const payload = {
       title: round.title,
       what: round.description || '',
-      tldr: `${round.roundType} round · ${round.numWinners} winner${round.numWinners !== 1 ? 's' : ''}`,
+      tldr: `Timed round · ${round.numWinners} winner${round.numWinners !== 1 ? 's' : ''}`,
       parentAuctionId: round.house.id,
       parentType: 'auction',
     };
@@ -114,9 +116,7 @@ export default function CreateRoundPage() {
       houseId: round.house.id,
       propStrategy: { type: 'custom', voters: round.voters },
       voteStrategy: { type: 'custom', voters: round.voters },
-      quorumFor: round.quorumFor,
-      quorumAgainst: round.quorumAgainst,
-      votingPeriod: round.votingPeriod,
+      contractAddress: contractAddress ?? null,
       address,
       signedData,
       messageTypes: PROPOSAL_MESSAGE_TYPES,
@@ -130,7 +130,8 @@ export default function CreateRoundPage() {
   useEffect(() => {
     if (!receipt || !txHash || !address || process.env.NEXT_PUBLIC_SKIP_ONCHAIN === 'true') return;
 
-    storeRoundInDb().catch((err) => {
+    const contractAddress = receipt.contractAddress;
+    storeRoundInDb(contractAddress).catch((err) => {
       alert(err.message ?? 'Failed to store round');
       setIsCreating(false);
     });
@@ -166,13 +167,9 @@ export default function CreateRoundPage() {
       case 5:
         return (
           <DatesStep
-            roundType={round.roundType}
             proposalPeriodStartUnixTimestamp={round.proposalPeriodStartUnixTimestamp}
             proposalPeriodDurationSecs={round.proposalPeriodDurationSecs}
             votePeriodDurationSecs={round.votePeriodDurationSecs}
-            quorumFor={round.quorumFor}
-            quorumAgainst={round.quorumAgainst}
-            votingPeriod={round.votingPeriod}
             onUpdate={(p) => updateRound(p)}
           />
         );

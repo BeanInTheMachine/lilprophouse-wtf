@@ -38,5 +38,4 @@ export {
   useSetWinners,
   useClaimAward,
   useCancelRound,
-  useOpenVoting,
 } from './useOnChain';

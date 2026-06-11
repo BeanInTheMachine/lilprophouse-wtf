@@ -43,6 +43,7 @@ export async function PATCH(
         ...(body.numWinners !== undefined && { numWinners: body.numWinners }),
         ...(body.proposalEndTime !== undefined && { proposalEndTime: new Date(body.proposalEndTime) }),
         ...(body.votingEndTime !== undefined && { votingEndTime: new Date(body.votingEndTime) }),
+        ...(body.contractAddress !== undefined && { contractAddress: body.contractAddress }),
       },
     });
 

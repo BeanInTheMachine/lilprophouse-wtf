@@ -61,11 +61,6 @@ export default function ReviewStep({ round, onUpdate, onCreate, isCreating }: Re
             )}
           </div>
         )}
-        {round.roundType === 'INFINITE' && (
-          <div className="text-sm text-brand-gray mt-1">
-            Continuous round · Quorum: {round.quorumFor ?? '—'} for / {round.quorumAgainst ?? '—'} against · {round.votingPeriod ?? '—'} day voting period
-          </div>
-        )}
       </SectionBlock>
 
       <Divider />
@@ -151,13 +146,9 @@ export default function ReviewStep({ round, onUpdate, onCreate, isCreating }: Re
       <Modal isOpen={editSection === 'dates'} onClose={() => setEditSection(null)}>
         <div className="p-6">
           <DatesStep
-            roundType={round.roundType}
             proposalPeriodStartUnixTimestamp={round.proposalPeriodStartUnixTimestamp}
             proposalPeriodDurationSecs={round.proposalPeriodDurationSecs}
             votePeriodDurationSecs={round.votePeriodDurationSecs}
-            quorumFor={round.quorumFor}
-            quorumAgainst={round.quorumAgainst}
-            votingPeriod={round.votingPeriod}
             onUpdate={(p) => { onUpdate(p); setEditSection(null); }}
           />
         </div>

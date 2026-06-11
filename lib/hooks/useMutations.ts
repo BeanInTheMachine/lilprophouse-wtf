@@ -17,7 +17,7 @@ export function useCreateRound() {
   });
 
   async function createRound(input: {
-    type: 'TIMED' | 'INFINITE';
+    type: 'TIMED';
     title: string;
     description?: string;
     fundingAmount: number;
@@ -27,9 +27,6 @@ export function useCreateRound() {
     proposalEndTime?: string;
     votingEndTime?: string;
     houseId?: number;
-    quorumFor?: number;
-    quorumAgainst?: number;
-    votingPeriod?: number;
   }) {
     setState({ data: null, loading: true, error: null });
     try {

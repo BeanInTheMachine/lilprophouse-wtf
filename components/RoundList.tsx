@@ -6,7 +6,7 @@ import type { RoundState } from '@prisma/client';
 interface RoundItem {
   id: number;
   title: string;
-  type: 'TIMED' | 'INFINITE';
+  type: 'TIMED';
   state: RoundState;
   fundingAmount: number;
   currencyType: string | null;
@@ -60,11 +60,6 @@ export default function RoundList({
                 <h3 className="font-bold text-base text-brand-black truncate">
                   {round.title}
                 </h3>
-                {round.type === 'INFINITE' && (
-                  <span className="text-xs font-medium text-brand-purple bg-brand-purple-hint px-2 py-0.5 rounded-full">
-                    Continuous
-                  </span>
-                )}
               </div>
               <StatusPill state={round.state} />
             </div>
@@ -76,7 +71,7 @@ export default function RoundList({
               </span>
               <span className="hidden sm:inline">&middot;</span>
               <span>
-                {round.type === 'TIMED' && round.proposalEndTime
+                {round.proposalEndTime
                   ? `Proposals close ${dayjs(round.proposalEndTime).format('MMM D, YYYY')}`
                   : `Started ${dayjs(round.startTime).format('MMM D, YYYY')}`}
               </span>

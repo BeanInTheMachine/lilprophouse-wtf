@@ -32,9 +32,6 @@ export interface RoundWithProposals {
   propStrategyDescription: string | null;
   voteStrategyDescription: string | null;
   displayComments: boolean;
-  quorumFor: number | null;
-  quorumAgainst: number | null;
-  votingPeriod: number | null;
   state: RoundState;
   houseId: number;
   createdAt: Date;

@@ -100,7 +100,7 @@ export function useRoundChainState(roundAddress?: string) {
   const { data: state } = useReadContract({
     address: roundAddress as Address | undefined,
     abi: LIL_ROUND_ABI,
-    functionName: 'state',
+    functionName: 'currentState',
     query: { enabled: !!roundAddress },
   });
 
@@ -132,12 +132,28 @@ export function useRoundChainState(roundAddress?: string) {
     query: { enabled: !!roundAddress },
   });
 
+  const { data: proposalEndTimestamp } = useReadContract({
+    address: roundAddress as Address | undefined,
+    abi: LIL_ROUND_ABI,
+    functionName: 'proposalEndTimestamp',
+    query: { enabled: !!roundAddress },
+  });
+
+  const { data: votingEndTimestamp } = useReadContract({
+    address: roundAddress as Address | undefined,
+    abi: LIL_ROUND_ABI,
+    functionName: 'votingEndTimestamp',
+    query: { enabled: !!roundAddress },
+  });
+
   return {
     state: state as number | undefined,
     owner: owner as string | undefined,
     totalDeposited: totalDeposited as bigint | undefined,
     numWinners: numWinners as bigint | undefined,
     title: roundTitle as string | undefined,
+    proposalEndTimestamp: proposalEndTimestamp as bigint | undefined,
+    votingEndTimestamp: votingEndTimestamp as bigint | undefined,
     loading: false,
   };
 }
@@ -186,6 +202,8 @@ export function useCreateRoundOnChain() {
     title: string,
     description: string,
     numWinners: number,
+    proposalDuration: number,
+    voteDuration: number,
   ) {
     setError(null);
     if (chainId !== base.id) await switchChainAsync({ chainId: base.id });
@@ -193,7 +211,7 @@ export function useCreateRoundOnChain() {
       return await deployContractAsync({
         abi: LIL_ROUND_ABI,
         bytecode: LilRoundArtifact.bytecode.object as `0x${string}`,
-        args: [owner, BigInt(houseId), title, description, BigInt(numWinners)],
+        args: [owner, BigInt(houseId), title, description, BigInt(numWinners), BigInt(proposalDuration), BigInt(voteDuration)],
       });
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
@@ -353,24 +371,4 @@ export function useCancelRound() {
   return { cancelRound, isPending, error };
 }
 
-/** Open voting phase on a LilRound (owner only) */
-export function useOpenVoting() {
-  const { writeContractAsync, isPending } = useWriteContract();
-  const [error, setError] = useState<string | null>(null);
 
-  async function openVoting(roundAddress: string) {
-    setError(null);
-    try {
-      return await writeContractAsync({
-        address: roundAddress as Address,
-        abi: LIL_ROUND_ABI,
-        functionName: 'openVoting',
-      });
-    } catch (e: any) {
-      setError(e.message ?? 'Transaction failed');
-      throw e;
-    }
-  }
-
-  return { openVoting, isPending, error };
-}

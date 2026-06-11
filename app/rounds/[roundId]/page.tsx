@@ -83,7 +83,6 @@ export default function RoundPage() {
   const banner = STATE_BANNERS[round.state] ?? STATE_BANNERS.NOT_STARTED;
   const colors = BANNER_COLORS[banner.variant];
   const proposals = round.proposals ?? [];
-  const isTimed = round.type === 'TIMED';
   const isAccepting = round.state === 'ACCEPTING_PROPOSALS';
 
   return (
@@ -108,6 +107,12 @@ export default function RoundPage() {
         <div className="flex items-center gap-3 mb-3">
           <h1 className="font-londrina text-3xl text-brand-black">{round.title}</h1>
           <StatusPill state={round.state} />
+          <Link
+            href={`/rounds/${roundId}/manage`}
+            className="ml-auto inline-flex items-center justify-center rounded-[10px] px-3 py-1.5 text-sm font-bold text-brand-purple border border-brand-purple hover:bg-brand-purple-hint transition-colors"
+          >
+            Manage
+          </Link>
         </div>
 
         {round.description && (
@@ -123,42 +128,34 @@ export default function RoundPage() {
           </span>
           <span>&middot;</span>
           <span>
-            {isTimed ? (
-              <>
-                {dayjs(round.startTime).format('MMM D, YYYY')} &ndash;{' '}
-                {round.votingEndTime ? dayjs(round.votingEndTime).format('MMM D, YYYY') : 'Ongoing'}
-              </>
-            ) : (
-              <>Started {dayjs(round.startTime).format('MMM D, YYYY')}</>
-            )}
+            {dayjs(round.startTime).format('MMM D, YYYY')} &ndash;{' '}
+            {round.votingEndTime ? dayjs(round.votingEndTime).format('MMM D, YYYY') : 'Ongoing'}
           </span>
         </div>
       </div>
 
-      {isTimed && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-surface-dark rounded-xl p-4 text-center">
-            <p className="text-xs text-brand-gray font-bold uppercase tracking-wider mb-1">Proposals</p>
-            <p className="font-londrina text-lg text-brand-black">
-              {dayjs(round.startTime).format('MMM D')} &ndash;{' '}
-              {round.proposalEndTime ? dayjs(round.proposalEndTime).format('MMM D, YYYY') : '—'}
-            </p>
-          </div>
-          <div className="bg-surface-dark rounded-xl p-4 text-center">
-            <p className="text-xs text-brand-gray font-bold uppercase tracking-wider mb-1">Voting</p>
-            <p className="font-londrina text-lg text-brand-black">
-              {round.proposalEndTime ? dayjs(round.proposalEndTime).format('MMM D') : '—'} &ndash;{' '}
-              {round.votingEndTime ? dayjs(round.votingEndTime).format('MMM D, YYYY') : '—'}
-            </p>
-          </div>
-          <div className="bg-surface-dark rounded-xl p-4 text-center">
-            <p className="text-xs text-brand-gray font-bold uppercase tracking-wider mb-1">Strategy</p>
-            <p className="font-londrina text-lg text-brand-black">
-              {round.propStrategyDescription ?? 'Open'}
-            </p>
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="bg-surface-dark rounded-xl p-4 text-center">
+          <p className="text-xs text-brand-gray font-bold uppercase tracking-wider mb-1">Proposals</p>
+          <p className="font-londrina text-lg text-brand-black">
+            {dayjs(round.startTime).format('MMM D')} &ndash;{' '}
+            {round.proposalEndTime ? dayjs(round.proposalEndTime).format('MMM D, YYYY') : '—'}
+          </p>
         </div>
-      )}
+        <div className="bg-surface-dark rounded-xl p-4 text-center">
+          <p className="text-xs text-brand-gray font-bold uppercase tracking-wider mb-1">Voting</p>
+          <p className="font-londrina text-lg text-brand-black">
+            {round.proposalEndTime ? dayjs(round.proposalEndTime).format('MMM D') : '—'} &ndash;{' '}
+            {round.votingEndTime ? dayjs(round.votingEndTime).format('MMM D, YYYY') : '—'}
+          </p>
+        </div>
+        <div className="bg-surface-dark rounded-xl p-4 text-center">
+          <p className="text-xs text-brand-gray font-bold uppercase tracking-wider mb-1">Strategy</p>
+          <p className="font-londrina text-lg text-brand-black">
+            {round.propStrategyDescription ?? 'Open'}
+          </p>
+        </div>
+      </div>
 
       <section>
         <div className="flex items-center justify-between mb-4">

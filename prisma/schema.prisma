@@ -21,7 +21,6 @@ model House {
 
 enum RoundType {
   TIMED
-  INFINITE
 }
 
 enum RoundState {
@@ -50,10 +49,8 @@ model Round {
   propStrategyDescription String?
   voteStrategyDescription String?
   displayComments         Boolean   @default(true)
-  quorumFor               Int?
-  quorumAgainst           Int?
-  votingPeriod            Int?
   state                   RoundState @default(NOT_STARTED)
+  contractAddress         String?
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 

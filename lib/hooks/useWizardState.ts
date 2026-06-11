@@ -43,13 +43,10 @@ export interface RoundWizardState {
     voters: GovPowerStrategy[];
     awards: EditableAsset[];
     numWinners: number;
-    roundType: 'TIMED' | 'INFINITE';
+    roundType: 'TIMED';
     proposalPeriodStartUnixTimestamp: number;
     proposalPeriodDurationSecs: number;
     votePeriodDurationSecs: number;
-    quorumFor: number | null;
-    quorumAgainst: number | null;
-    votingPeriod: number | null;
   };
 }
 
@@ -84,9 +81,6 @@ export const INITIAL_STATE: RoundWizardState = {
     proposalPeriodStartUnixTimestamp: 0,
     proposalPeriodDurationSecs: 0,
     votePeriodDurationSecs: 0,
-    quorumFor: null,
-    quorumAgainst: null,
-    votingPeriod: null,
   },
 };
 
@@ -106,14 +100,11 @@ function isStepValid(state: RoundWizardState, step: number): boolean {
         round.numWinners > 0
       );
     case 5:
-      if (round.roundType === 'TIMED') {
-        return (
-          round.proposalPeriodStartUnixTimestamp > 0 &&
-          round.proposalPeriodDurationSecs > 0 &&
-          round.votePeriodDurationSecs > 0
-        );
-      }
-      return round.proposalPeriodStartUnixTimestamp > 0;
+      return (
+        round.proposalPeriodStartUnixTimestamp > 0 &&
+        round.proposalPeriodDurationSecs > 0 &&
+        round.votePeriodDurationSecs > 0
+      );
     case 6:
       return true;
     default:

@@ -6,7 +6,7 @@ import type { RoundState } from '@prisma/client';
 interface RoundCardProps {
   id: number;
   title: string;
-  type: 'TIMED' | 'INFINITE';
+  type: 'TIMED';
   state: RoundState;
   fundingAmount: number;
   currencyType: string | null;
@@ -35,11 +35,6 @@ export default function RoundCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-base text-brand-black truncate">{title}</h3>
-          {type === 'INFINITE' && (
-            <span className="text-xs font-medium text-brand-purple bg-brand-purple-hint px-2 py-0.5 rounded-full">
-              Continuous
-            </span>
-          )}
         </div>
         <StatusPill state={state} />
       </div>
@@ -50,7 +45,7 @@ export default function RoundCard({
         </span>
         <span className="hidden sm:inline">&middot;</span>
         <span>
-          {type === 'TIMED' && proposalEndTime
+          {proposalEndTime
             ? `Proposals close ${dayjs(proposalEndTime).format('MMM D, YYYY')}`
             : `Started ${dayjs(startTime).format('MMM D, YYYY')}`}
         </span>
