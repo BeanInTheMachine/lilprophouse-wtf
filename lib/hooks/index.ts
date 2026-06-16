@@ -38,4 +38,11 @@ export {
   useSetWinners,
   useClaimAward,
   useCancelRound,
+  useApproveToken,
+  useDepositTokenToRound,
+  useApproveERC721,
+  useApproveERC1155,
+  useDepositERC721,
+  useDepositERC1155,
+  useSetWinnerNfts,
 } from './useOnChain';

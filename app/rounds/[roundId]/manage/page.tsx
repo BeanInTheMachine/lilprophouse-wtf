@@ -3,15 +3,277 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
-import { useCancelRound, useRoundChainState, useDepositToRound, useSetWinners } from '@/lib/hooks/useOnChain';
-import { useBalance } from 'wagmi';
-import { type Address } from 'viem';
+import { useCancelRound, useRoundChainState, useDepositToRound, useSetWinners, useApproveToken, useDepositTokenToRound, useApproveERC721, useApproveERC1155, useDepositERC721, useDepositERC1155 } from '@/lib/hooks/useOnChain';
+import { useBalance, useReadContract } from 'wagmi';
+import { type Address, parseAbi } from 'viem';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import InputFormGroup from '@/components/ui/InputFormGroup';
 import LoadingIndicator from '@/components/ui/LoadingIndicator';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { patch } from '@/lib/api-client';
+import RewardsDisplay from '@/components/round/RewardsDisplay';
+
+const ERC20_SYM_ABI = parseAbi(['function symbol() view returns (string)']);
+const ERC20_DEC_ABI = parseAbi(['function decimals() view returns (uint8)']);
+const ERC20_BAL_ABI = parseAbi(['function balanceOf(address) view returns (uint256)']);
+
+function NftDepositSection({ roundAddress }: { roundAddress: string }) {
+  const { approve: approve721, isPending: approving721 } = useApproveERC721();
+  const { setApprovalForAll, isPending: approving1155 } = useApproveERC1155();
+  const { depositERC721, isPending: depositing721 } = useDepositERC721();
+  const { depositERC1155, isPending: depositing1155 } = useDepositERC1155();
+
+  const [nftType, setNftType] = useState<'ERC721' | 'ERC1155'>('ERC721');
+  const [nftAddress, setNftAddress] = useState('');
+  const [tokenId, setTokenId] = useState('');
+  const [nftAmount, setNftAmount] = useState('1');
+  const [status, setStatus] = useState('');
+  const [isApproved, setIsApproved] = useState(false);
+  const [approveHash, setApproveHash] = useState<`0x${string}` | null>(null);
+  const [depositHash, setDepositHash] = useState<`0x${string}` | null>(null);
+
+  const validNftAddr = (nftAddress.match(/^0x[a-fA-F0-9]{40}$/) ? nftAddress as Address : undefined);
+
+  const { data: nftName } = useReadContract({
+    address: validNftAddr,
+    abi: parseAbi(['function name() view returns (string)']),
+    functionName: 'name',
+    query: { enabled: !!validNftAddr },
+  });
+
+  const { data: approveReceipt } = useWaitForTransactionReceipt({ hash: approveHash ?? undefined });
+  const { data: depositReceipt } = useWaitForTransactionReceipt({ hash: depositHash ?? undefined });
+
+  useEffect(() => {
+    if (approveReceipt && status === 'approving') { setIsApproved(true); setStatus(''); }
+  }, [approveReceipt, status]);
+
+  useEffect(() => {
+    if (depositReceipt && status === 'depositing') { setStatus('confirmed'); }
+  }, [depositReceipt, status]);
+
+  const tokenIdNum = parseInt(tokenId, 10);
+  const amountNum = parseInt(nftAmount, 10) || 1;
+
+  return (
+    <>
+      <p className="text-sm text-brand-gray mb-4">
+        Deposit NFTs as round rewards. Approve the round contract first, then deposit.
+      </p>
+
+      <div className="flex gap-2 mb-3">
+        {(['ERC721', 'ERC1155'] as const).map((t) => (
+          <button key={t} onClick={() => { setNftType(t); setIsApproved(false); }}
+            className={`px-3 py-1 rounded-[10px] text-xs font-bold ${nftType === t ? 'bg-brand-purple text-white' : 'bg-surface-dark text-brand-gray'}`}>
+            {t}
+          </button>
+        ))}
+      </div>
+
+      <InputFormGroup label="NFT Contract Address" name="nftAddress" value={nftAddress}
+        onChange={(e) => { setNftAddress(e.target.value); setIsApproved(false); }}
+        placeholder="0x..." className="mb-3" />
+      {nftName && <p className="text-xs text-brand-green mb-3">Collection: {nftName}</p>}
+
+      <InputFormGroup label="Token ID" name="tokenId" value={tokenId}
+        onChange={(e) => setTokenId(e.target.value)} placeholder="1" className="mb-3" />
+
+      {nftType === 'ERC1155' && (
+        <InputFormGroup label="Amount" name="nftAmount" value={nftAmount}
+          onChange={(e) => setNftAmount(e.target.value)} placeholder="1" className="mb-3" />
+      )}
+
+      {validNftAddr && !isNaN(tokenIdNum) && (
+        <div className="flex gap-3 items-end mb-3">
+          {!isApproved ? (
+            <Button onClick={async () => {
+              if (!roundAddress || !validNftAddr) return;
+              setStatus('approving');
+              try {
+                if (nftType === 'ERC721') {
+                  const hash = await approve721(validNftAddr, roundAddress, BigInt(tokenIdNum));
+                  setApproveHash(hash);
+                } else {
+                  const hash = await setApprovalForAll(validNftAddr, roundAddress, true);
+                  setApproveHash(hash);
+                }
+              } catch { setStatus(''); }
+            }} disabled={(nftType === 'ERC721' ? approving721 : approving1155) || status === 'approving'}>
+              {status === 'approving' ? 'Approving...' : 'Approve'}
+            </Button>
+          ) : (
+            <Button onClick={async () => {
+              if (!roundAddress || !validNftAddr || isNaN(tokenIdNum)) return;
+              setStatus('depositing');
+              try {
+                if (nftType === 'ERC721') {
+                  const hash = await depositERC721(roundAddress, validNftAddr, BigInt(tokenIdNum));
+                  setDepositHash(hash);
+                } else {
+                  if (amountNum <= 0) return;
+                  const hash = await depositERC1155(roundAddress, validNftAddr, BigInt(tokenIdNum), BigInt(amountNum));
+                  setDepositHash(hash);
+                }
+                setNftAddress(''); setTokenId(''); setNftAmount('1'); setIsApproved(false);
+              } catch { setStatus(''); }
+            }} disabled={depositing721 || depositing1155 || status === 'depositing'}>
+              {status === 'depositing' ? 'Depositing...' : `Deposit ${nftType}`}
+            </Button>
+          )}
+        </div>
+      )}
+      {status === 'approving' && <p className="text-sm text-brand-purple mb-3">Awaiting approval confirmation...</p>}
+      {status === 'depositing' && <p className="text-sm text-brand-purple mb-3">Transaction pending...</p>}
+      {status === 'confirmed' && <p className="text-sm text-brand-green mb-3">NFT deposited successfully.</p>}
+    </>
+  );
+}
+
+function Erc20DepositSection({ roundAddress }: { roundAddress: string }) {
+  const { approve, isPending: approving } = useApproveToken();
+  const { depositToken, isPending: depositingToken } = useDepositTokenToRound();
+
+  const [tokenAddress, setTokenAddress] = useState('');
+  const [tokenAmount, setTokenAmount] = useState('');
+  const [tokenStatus, setTokenStatus] = useState('');
+  const [isApproved, setIsApproved] = useState(false);
+  const [approveHash, setApproveHash] = useState<`0x${string}` | null>(null);
+  const [depositHash, setDepositHash] = useState<`0x${string}` | null>(null);
+
+  const validToken = (tokenAddress.match(/^0x[a-fA-F0-9]{40}$/)
+    ? (tokenAddress as Address)
+    : undefined) as Address | undefined;
+
+  const { data: symbol } = useReadContract({
+    address: validToken,
+    abi: ERC20_SYM_ABI,
+    functionName: 'symbol',
+    query: { enabled: !!validToken },
+  });
+
+  const { data: decimals } = useReadContract({
+    address: validToken,
+    abi: ERC20_DEC_ABI,
+    functionName: 'decimals',
+    query: { enabled: !!validToken },
+  });
+
+  const { data: balance } = useReadContract({
+    address: validToken,
+    abi: ERC20_BAL_ABI,
+    functionName: 'balanceOf',
+    args: [roundAddress as Address],
+    query: { enabled: !!validToken },
+  });
+
+  const { data: approveReceipt } = useWaitForTransactionReceipt({ hash: approveHash ?? undefined });
+  const { data: depositReceipt } = useWaitForTransactionReceipt({ hash: depositHash ?? undefined });
+
+  useEffect(() => {
+    if (approveReceipt && tokenStatus === 'approving') {
+      setIsApproved(true);
+      setTokenStatus('');
+    }
+  }, [approveReceipt, tokenStatus]);
+
+  useEffect(() => {
+    if (depositReceipt && tokenStatus === 'depositing') {
+      setTokenStatus('confirmed');
+    }
+  }, [depositReceipt, tokenStatus]);
+
+  const decimalsNum = Number(decimals) || 18;
+
+  return (
+    <>
+      <p className="text-sm text-brand-gray mb-4">
+        Deposit ERC20 tokens. Approve the round contract first, then deposit.
+      </p>
+
+      <InputFormGroup
+        label="Token Address"
+        name="tokenAddress"
+        value={tokenAddress}
+        onChange={(e) => { setTokenAddress(e.target.value); setIsApproved(false); }}
+        placeholder="0x..."
+        className="mb-3"
+      />
+      {symbol && (
+        <p className="text-xs text-brand-green mb-3">
+          Token: {symbol}
+          {balance !== undefined && (
+            <> | Contract balance: {Number(balance) / 10 ** decimalsNum}</>
+          )}
+        </p>
+      )}
+
+      {validToken && (
+        <>
+          <div className="flex gap-3 items-end mb-3">
+            <InputFormGroup
+              label={`Amount (${symbol || 'ERC20'})`}
+              name="tokenAmount"
+              value={tokenAmount}
+              onChange={(e) => setTokenAmount(e.target.value)}
+              placeholder="0.00"
+              className="flex-1"
+            />
+            {!isApproved ? (
+              <Button
+                onClick={async () => {
+                  if (!roundAddress || !tokenAmount) return;
+                  const amountWei = BigInt(Math.floor(parseFloat(tokenAmount) * 10 ** decimalsNum));
+                  if (amountWei <= 0n) return;
+                  setTokenStatus('approving');
+                  try {
+                    const hash = await approve(validToken, roundAddress, amountWei);
+                    setApproveHash(hash);
+                  } catch {
+                    setTokenStatus('');
+                  }
+                }}
+                disabled={approving || !tokenAmount || tokenStatus === 'approving'}
+              >
+                {tokenStatus === 'approving' ? 'Approving...' : approving ? 'Signing...' : 'Approve'}
+              </Button>
+            ) : (
+              <Button
+                onClick={async () => {
+                  if (!roundAddress || !tokenAmount || !validToken) return;
+                  const amountWei = BigInt(Math.floor(parseFloat(tokenAmount) * 10 ** decimalsNum));
+                  if (amountWei <= 0n) return;
+                  setTokenStatus('depositing');
+                  try {
+                    const hash = await depositToken(roundAddress, validToken, amountWei);
+                    setDepositHash(hash);
+                    setTokenAmount('');
+                    setIsApproved(false);
+                  } catch {
+                    setTokenStatus('');
+                  }
+                }}
+                disabled={depositingToken || !tokenAmount || tokenStatus === 'depositing'}
+              >
+                {tokenStatus === 'depositing' ? 'Depositing...' : depositingToken ? 'Signing...' : `Deposit ${symbol || 'ERC20'}`}
+              </Button>
+            )}
+          </div>
+          {tokenStatus === 'approving' && (
+            <p className="text-sm text-brand-purple mb-3">Awaiting approval confirmation...</p>
+          )}
+          {tokenStatus === 'depositing' && (
+            <p className="text-sm text-brand-purple mb-3">Transaction pending. Waiting for confirmation...</p>
+          )}
+          {tokenStatus === 'confirmed' && (
+            <p className="text-sm text-brand-green mb-3">Token deposit confirmed.</p>
+          )}
+        </>
+      )}
+    </>
+  );
+}
 
 export default function RoundManagerPage() {
   const params = useParams<{ roundId: string }>();
@@ -19,22 +281,48 @@ export default function RoundManagerPage() {
   const router = useRouter();
   const { address } = useAccount();
   const { data: round, loading, error: fetchError } = useRound(roundId);
-  const { state: chainState, owner: chainOwner } = useRoundChainState(round?.contractAddress ?? undefined);
+  const chainAddress = (round?.contractAddress as Address | undefined) ?? '0x0000000000000000000000000000000000000000';
+  const { state: chainState, owner: chainOwner } = useRoundChainState(chainAddress);
 
   const { cancelRound, isPending: cancelling } = useCancelRound();
   const { setWinners, isPending: settingWinners } = useSetWinners();
   const { depositEth, isPending: depositing } = useDepositToRound();
   const [depositAmount, setDepositAmount] = useState('');
+  const [lastDepositAmount, setLastDepositAmount] = useState('');
   const [depositStatus, setDepositStatus] = useState('');
+  const [depositType, setDepositType] = useState<'ETH' | 'ERC20' | 'NFT'>('ETH');
 
-  const { data: roundBalance } = useBalance({
-    address: round?.contractAddress as Address | undefined,
+  const { data: roundBalance, refetch: refetchBalance } = useBalance({
+    address: chainAddress as Address,
   });
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
+  const [depositTxHash, setDepositTxHash] = useState<`0x${string}` | null>(null);
   const [actionError, setActionError] = useState('');
   const [actionLabel, setActionLabel] = useState<string | null>(null);
 
   const { isLoading: waiting } = useWaitForTransactionReceipt({ hash: txHash ?? undefined });
+  const { data: depositReceipt } = useWaitForTransactionReceipt({ hash: depositTxHash ?? undefined });
+
+  const syncDepositToDb = useCallback(async () => {
+    if (!depositReceipt || depositStatus !== 'confirming' || !lastDepositAmount) return;
+    const amount = parseFloat(lastDepositAmount);
+    if (amount <= 0 || isNaN(amount)) return;
+    try {
+      const currentFunding = Number(round?.fundingAmount ?? 0);
+      await patch(`/api/rounds/${roundId}`, { fundingAmount: currentFunding + amount });
+      setDepositStatus('confirmed');
+      setLastDepositAmount('');
+    } catch {
+      setDepositStatus('sent');
+    }
+  }, [depositReceipt, depositStatus, lastDepositAmount, round?.fundingAmount, roundId]);
+
+  useEffect(() => {
+    if (depositReceipt && depositStatus === 'confirming') {
+      syncDepositToDb();
+      refetchBalance();
+    }
+  }, [depositReceipt, depositStatus, syncDepositToDb, refetchBalance]);
 
   if (loading) return <LoadingIndicator />;
   if (fetchError || !round) {
@@ -106,7 +394,7 @@ export default function RoundManagerPage() {
           <h3 className="font-bold text-lg text-brand-black mb-4">Round Information</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
             {[
-              ['Status', round.state],
+              ['Status', round.state.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())],
               ['Type', round.type],
               ['Funding', `${String(round.fundingAmount)} ${round.currencyType ?? ''}`],
               ['Winners', String(round.numWinners)],
@@ -144,6 +432,94 @@ export default function RoundManagerPage() {
           </Card>
         )}
 
+        {/* Deposit */}
+        <Card className="p-6">
+          <h3 className="font-bold text-lg text-brand-black mb-4">Deposit Assets</h3>
+
+          <div className="flex gap-2 mb-4">
+            {(['ETH', 'ERC20', 'NFT'] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => setDepositType(type)}
+                className={`px-4 py-1.5 rounded-[10px] text-sm font-bold transition-colors ${
+                  depositType === type
+                    ? 'bg-brand-purple text-white'
+                    : 'bg-surface-dark text-brand-gray hover:text-brand-black'
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+
+          {depositType === 'ETH' ? (
+            <>
+              <p className="text-sm text-brand-gray mb-4">
+                {round.contractAddress
+                  ? `Fund this round by depositing ETH. Current balance: ${roundBalance?.formatted ?? '0'} ${roundBalance?.symbol ?? 'ETH'}.`
+                  : 'Deposit assets after the round is deployed on-chain.'}
+              </p>
+              <div className="flex gap-3 items-end">
+                <InputFormGroup
+                  label="Amount (ETH)"
+                  name="deposit"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="flex-1"
+                />
+                <Button
+                  onClick={async () => {
+                    if (!round?.contractAddress || !depositAmount) return;
+                    setDepositStatus('depositing');
+                    try {
+                      const hash = await depositEth(round.contractAddress, depositAmount);
+                      setDepositTxHash(hash);
+                      setLastDepositAmount(depositAmount);
+                      setDepositAmount('');
+                      setDepositStatus('confirming');
+                    } catch {
+                      setDepositStatus('');
+                    }
+                  }}
+                  disabled={depositing || !depositAmount || !round?.contractAddress || depositStatus === 'confirming'}
+                >
+                  {depositStatus === 'confirming' ? 'Confirming...' : depositing ? 'Sending...' : 'Deposit ETH'}
+                </Button>
+              </div>
+              {depositStatus === 'confirming' && (
+                <p className="text-sm text-brand-purple mt-3">Transaction pending. Waiting for confirmation...</p>
+              )}
+              {depositStatus === 'confirmed' && (
+                <p className="text-sm text-brand-green mt-3">Deposit confirmed. Balance and funding updated.</p>
+              )}
+              {depositStatus === 'sent' && (
+                <p className="text-sm text-brand-green mt-3">Transaction sent. Balance will update once confirmed.</p>
+              )}
+            </>
+          ) : depositType === 'ERC20' ? (
+            round.contractAddress ? (
+              <Erc20DepositSection roundAddress={round.contractAddress} />
+            ) : (
+              <p className="text-sm text-brand-gray">Deposit assets after the round is deployed on-chain.</p>
+            )
+          ) : (
+            round.contractAddress ? (
+              <NftDepositSection roundAddress={round.contractAddress} />
+            ) : (
+              <p className="text-sm text-brand-gray">Deposit assets after the round is deployed on-chain.</p>
+            )
+          )}
+
+          {depositType === 'NFT' && round.contractAddress && (
+            <RewardsDisplay roundAddress={round.contractAddress} />
+          )}
+
+          <p className="text-xs text-brand-gray mt-3">
+            Deposits go directly to the round contract. Anyone can fund a round.
+          </p>
+        </Card>
+
         {/* Actions */}
         <Card className="p-6">
           <h3 className="font-bold text-lg text-brand-black mb-4">Actions</h3>
@@ -165,49 +541,6 @@ export default function RoundManagerPage() {
               <p className="text-xs text-brand-gray text-center">Only the round owner can perform actions.</p>
             )}
           </div>
-        </Card>
-
-        {/* Deposit */}
-        <Card className="p-6">
-          <h3 className="font-bold text-lg text-brand-black mb-4">Deposit Assets</h3>
-          <p className="text-sm text-brand-gray mb-4">
-            {round.contractAddress
-              ? `Fund this round by depositing ETH. Current balance: ${roundBalance?.formatted ?? '0'} ${roundBalance?.symbol ?? 'ETH'}.`
-              : 'Deposit assets after the round is deployed on-chain.'}
-          </p>
-
-          <div className="flex gap-3 items-end">
-            <InputFormGroup
-              label="Amount (ETH)"
-              name="deposit"
-              value={depositAmount}
-              onChange={(e) => setDepositAmount(e.target.value)}
-              placeholder="0.00"
-              className="flex-1"
-            />
-            <Button
-              onClick={async () => {
-                if (!round?.contractAddress || !depositAmount) return;
-                setDepositStatus('depositing');
-                try {
-                  await depositEth(round.contractAddress, depositAmount);
-                  setDepositStatus('sent');
-                  setDepositAmount('');
-                } catch (e: any) {
-                  setDepositStatus('');
-                }
-              }}
-              disabled={depositing || !depositAmount || !round?.contractAddress}
-            >
-              {depositing ? 'Sending...' : 'Deposit ETH'}
-            </Button>
-          </div>
-          {depositStatus === 'sent' && (
-            <p className="text-sm text-brand-green mt-3">Transaction sent. Balance will update once confirmed.</p>
-          )}
-          <p className="text-xs text-brand-gray mt-3">
-            Deposits go directly to the round contract. Anyone can fund a round.
-          </p>
         </Card>
       </div>
     </div>

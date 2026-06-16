@@ -47,21 +47,28 @@ export default function CreateRoundPage() {
     setIsCreating(true);
 
     try {
-      // Deploy round on-chain (or skip if NEXT_PUBLIC_SKIP_ONCHAIN=true)
-      const hash = await createRound(
-        address,
-        round.house.id,
-        round.title,
-        round.description || '',
-        round.numWinners,
-        round.proposalPeriodDurationSecs,
-        round.votePeriodDurationSecs,
-      );
-      setTxHash(hash);
-
-      // If skipping on-chain, store directly without waiting for receipt
       if (process.env.NEXT_PUBLIC_SKIP_ONCHAIN === 'true') {
         await storeRoundInDb();
+        return;
+      }
+
+      try {
+        const hash = await createRound(
+          address,
+          round.house.id,
+          round.title,
+          round.description || '',
+          round.numWinners,
+          round.proposalPeriodDurationSecs,
+          round.votePeriodDurationSecs,
+        );
+        setTxHash(hash);
+      } catch (deployErr: any) {
+        if (deployErr.message?.includes('chain')) {
+          await storeRoundInDb();
+          return;
+        }
+        throw deployErr;
       }
     } catch (err: any) {
       if (err.message?.includes('rejected') || err.message?.includes('denied')) {
@@ -130,7 +137,7 @@ export default function CreateRoundPage() {
   useEffect(() => {
     if (!receipt || !txHash || !address || process.env.NEXT_PUBLIC_SKIP_ONCHAIN === 'true') return;
 
-    const contractAddress = receipt.contractAddress;
+    const contractAddress = receipt.contractAddress ?? undefined;
     storeRoundInDb(contractAddress).catch((err) => {
       alert(err.message ?? 'Failed to store round');
       setIsCreating(false);

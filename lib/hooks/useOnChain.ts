@@ -8,6 +8,19 @@ import { HOUSE_REGISTRY_ABI, LIL_ROUND_ABI } from '@/lib/contracts/abis';
 import { HOUSE_REGISTRY_ADDRESS } from '@/lib/contracts/addresses';
 import LilRoundArtifact from '@/contracts/out/LilRound.sol/LilRound.json';
 
+const APPROVE_ABI = [
+  {
+    type: 'function',
+    name: 'approve',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+] as const;
+
 /* ============================================
    READ HOOKS
    ============================================ */
@@ -371,4 +384,167 @@ export function useCancelRound() {
   return { cancelRound, isPending, error };
 }
 
+/** Approve ERC20 token spend for a round contract */
+export function useApproveToken() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
 
+  async function approve(tokenAddress: string, spender: string, amount: bigint) {
+    setError(null);
+    try {
+      return await writeContractAsync({
+        address: tokenAddress as Address,
+        abi: APPROVE_ABI,
+        functionName: 'approve',
+        args: [spender as Address, amount],
+      });
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { approve, isPending, error };
+}
+
+/** Deposit ERC20 tokens into a LilRound */
+export function useDepositTokenToRound() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  async function depositToken(roundAddress: string, tokenAddress: string, amount: bigint) {
+    setError(null);
+    try {
+      return await writeContractAsync({
+        address: roundAddress as Address,
+        abi: LIL_ROUND_ABI,
+        functionName: 'depositToken',
+        args: [tokenAddress as Address, amount],
+      });
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { depositToken, isPending, error };
+}
+
+/** Approve ERC721 token for a round contract */
+export function useApproveERC721() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  async function approve(nftAddress: string, roundAddress: string, tokenId: bigint) {
+    setError(null);
+    try {
+      return await writeContractAsync({
+        address: nftAddress as Address,
+        abi: [
+          { type: 'function', name: 'approve', inputs: [{ name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], outputs: [], stateMutability: 'nonpayable' },
+        ] as const,
+        functionName: 'approve',
+        args: [roundAddress as Address, tokenId],
+      });
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { approve, isPending, error };
+}
+
+/** Approve ERC1155 operator for a round contract */
+export function useApproveERC1155() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  async function setApprovalForAll(nftAddress: string, roundAddress: string, approved: boolean) {
+    setError(null);
+    try {
+      return await writeContractAsync({
+        address: nftAddress as Address,
+        abi: [
+          { type: 'function', name: 'setApprovalForAll', inputs: [{ name: 'operator', type: 'address' }, { name: 'approved', type: 'bool' }], outputs: [], stateMutability: 'nonpayable' },
+        ] as const,
+        functionName: 'setApprovalForAll',
+        args: [roundAddress as Address, approved],
+      });
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { setApprovalForAll, isPending, error };
+}
+
+/** Deposit an ERC721 NFT into a LilRound */
+export function useDepositERC721() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  async function depositERC721(roundAddress: string, nftAddress: string, tokenId: bigint) {
+    setError(null);
+    try {
+      return await writeContractAsync({
+        address: roundAddress as Address,
+        abi: LIL_ROUND_ABI,
+        functionName: 'depositERC721',
+        args: [nftAddress as Address, tokenId],
+      });
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { depositERC721, isPending, error };
+}
+
+/** Deposit ERC1155 tokens into a LilRound */
+export function useDepositERC1155() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  async function depositERC1155(roundAddress: string, nftAddress: string, tokenId: bigint, amount: bigint) {
+    setError(null);
+    try {
+      return await writeContractAsync({
+        address: roundAddress as Address,
+        abi: LIL_ROUND_ABI,
+        functionName: 'depositERC1155',
+        args: [nftAddress as Address, tokenId, amount],
+      });
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { depositERC1155, isPending, error };
+}
+
+/** Set winner NFTs for a proposal (owner only) */
+export function useSetWinnerNfts() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  async function setWinnerNfts(roundAddress: string, proposalId: number, nftIndices: number[]) {
+    setError(null);
+    try {
+      return await writeContractAsync({
+        address: roundAddress as Address,
+        abi: LIL_ROUND_ABI,
+        functionName: 'setWinnerNfts',
+        args: [BigInt(proposalId), nftIndices.map((i) => BigInt(i))],
+      });
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { setWinnerNfts, isPending, error };
+}

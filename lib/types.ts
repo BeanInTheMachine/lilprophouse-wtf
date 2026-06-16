@@ -33,6 +33,7 @@ export interface RoundWithProposals {
   voteStrategyDescription: string | null;
   displayComments: boolean;
   state: RoundState;
+  contractAddress: string | null;
   houseId: number;
   createdAt: Date;
   updatedAt: Date;

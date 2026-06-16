@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
 import { useRoundChainState, useVoteOnChain } from '@/lib/hooks/useOnChain';
-import StatusPill from '@/components/ui/StatusPill';
+import RewardsDisplay from '@/components/round/RewardsDisplay';
 import Link from 'next/link';
 import dayjs from 'dayjs';
 
@@ -48,9 +48,31 @@ export default function RoundPage() {
   const roundId = parseInt(params.roundId, 10);
   const { data: round, loading, error } = useRound(roundId);
   const { address: wallet } = useAccount();
-  const { state: chainState, owner: chainOwner } = useRoundChainState(round?.contractAddress ?? undefined);
+  const chainAddress = (round?.contractAddress as `0x${string}` | undefined) ?? '0x0000000000000000000000000000000000000000';
+  const { state: chainState, owner: chainOwner, totalDeposited } = useRoundChainState(chainAddress);
   const { vote, isPending: voting } = useVoteOnChain();
   const [votingPropId, setVotingPropId] = useState<number | null>(null);
+
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  function formatCountdown(deadline: Date): string | null {
+    const diff = dayjs(deadline).diff(dayjs(now));
+    if (diff <= 0) return null;
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    const parts: string[] = [];
+    if (d > 0) parts.push(`${d}d`);
+    if (h > 0) parts.push(`${h}h`);
+    if (m > 0) parts.push(`${m}m`);
+    parts.push(`${s}s`);
+    return parts.join(' ');
+  }
 
   if (loading) {
     return (
@@ -99,6 +121,17 @@ export default function RoundPage() {
         <div className="flex items-center gap-3">
           <span className={`w-2.5 h-2.5 rounded-full ${colors.text.replace('text-', 'bg-')}`} />
           <h2 className={`font-bold text-base ${colors.text}`}>{banner.title}</h2>
+          {(round.state === 'ACCEPTING_PROPOSALS' || round.state === 'VOTING') && (
+            'proposalEndTime' in round && 'votingEndTime' in round && (
+              <span className="ml-auto font-mono text-sm font-bold text-brand-black">
+                {formatCountdown(
+                  round.state === 'ACCEPTING_PROPOSALS'
+                    ? round.proposalEndTime!
+                    : round.votingEndTime!
+                ) ?? 'Ended'}
+              </span>
+            )
+          )}
         </div>
         <p className="text-sm text-brand-gray mt-1 ml-5.5">{banner.message}</p>
       </div>
@@ -106,7 +139,6 @@ export default function RoundPage() {
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-3">
           <h1 className="font-londrina text-3xl text-brand-black">{round.title}</h1>
-          <StatusPill state={round.state} />
           <Link
             href={`/rounds/${roundId}/manage`}
             className="ml-auto inline-flex items-center justify-center rounded-[10px] px-3 py-1.5 text-sm font-bold text-brand-purple border border-brand-purple hover:bg-brand-purple-hint transition-colors"
@@ -132,6 +164,23 @@ export default function RoundPage() {
             {round.votingEndTime ? dayjs(round.votingEndTime).format('MMM D, YYYY') : 'Ongoing'}
           </span>
         </div>
+
+        {round.contractAddress && totalDeposited !== undefined && Number(round.fundingAmount) > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-sm mb-1">
+              <span className="font-bold text-brand-black">Funding Progress</span>
+              <span className="text-brand-gray">
+                {Number(totalDeposited) / 1e18} / {Number(round.fundingAmount)} {round.currencyType ?? 'ETH'}
+              </span>
+            </div>
+            <div className="w-full h-3 bg-border-light rounded-full overflow-hidden">
+              <div
+                className="h-full bg-brand-green rounded-full transition-all duration-500"
+                style={{ width: `${Math.min((Number(totalDeposited) / 1e18 / Number(round.fundingAmount)) * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -156,6 +205,10 @@ export default function RoundPage() {
           </p>
         </div>
       </div>
+
+      {round.contractAddress && (
+        <RewardsDisplay roundAddress={round.contractAddress} />
+      )}
 
       <section>
         <div className="flex items-center justify-between mb-4">

@@ -9,6 +9,8 @@ import { useProposeOnChain } from '@/lib/hooks/useOnChain';
 import { post } from '@/lib/api-client';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 export default function CreateProposalPage() {
   const router = useRouter();
   const searchParams = useSearchParams();

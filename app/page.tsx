@@ -15,7 +15,7 @@ export default function Home() {
             <div className="w-full lg:w-8/12 pt-8 lg:pt-0 flex flex-col justify-center">
               <h1 className="font-bold text-6xl text-brand-black">Lil Rounds</h1>
               <p className="text-[25px] text-brand-gray mt-2 max-w-xl">
-                A simple and fun way to award people onchain. Set up a round, tell the internet and watch magic happen.
+                A simple and fun way to award people onchain. Set up a round, tell the internet and watch the magic happen.
               </p>
               <div className="flex gap-3 mt-4">
                 <a
@@ -69,9 +69,9 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col lg:flex-row items-center">
             <div className="homeCityTitleCol lg:w-6/12 py-8 text-center lg:text-left">
-              <h2 className="font-bold text-[40px] text-brand-black">Born in Nouns</h2>
+              <h2 className="font-bold text-[40px] text-brand-black">Fork&apos;d by Lils</h2>
               <p className="text-lg text-brand-gray mt-2 max-w-md">
-                Lil Rounds is a project born and funded by Nouns. It serves as an open invitation for all onchain communities to build the world they want to see.
+                This is an open invitation for all onchain communities to build the world they want to see.
               </p>
             </div>
           </div>
@@ -91,8 +91,8 @@ export default function Home() {
               { title: 'Make it fun', desc: 'Turn your boring bounty or grants program into a fun experience builders and voters can enjoy.' },
               { title: 'Awards', desc: 'Use any type of asset to award builders - ETH, USDC or NFTs (and more). Anything to get the people going.' },
               { title: 'Cross pollinate', desc: 'Let builders from all corners of Ethereum build for your community.' },
-              { title: 'Transparent', desc: 'Allow builders to see how winners are decided on through simple and transparent voting.' },
-              { title: 'Onchain & open source', desc: 'From round creation to award claiming — the entire Lil Rounds stack is onchain and open source.' },
+                  { title: 'Transparent', desc: 'Winners are decided through simple and transparent voting.' },
+                  { title: 'Onchain & open source', desc: 'From round creation to award claims, the entire Lil Rounds stack is onchain and open source.' },
               { title: 'Simple', desc: 'Enjoy an intuitive interface that makes clunky crypto apps a thing of the past.' },
             ].map((feature) => (
               <div key={feature.title} className="homeFeatureItem">

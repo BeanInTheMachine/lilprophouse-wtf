@@ -14,6 +14,7 @@ const nextConfig = {
         'pino-pretty': false,
         'child_process': false,
         ws: false,
+        '@react-native-async-storage/async-storage': false,
       };
     }
     config.externals.push({
