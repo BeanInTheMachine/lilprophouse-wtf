@@ -1,7 +1,7 @@
 'use client';
 
-import { useAccount, useChainId, useSwitchChain, useWriteContract, useReadContract, useDeployContract } from 'wagmi';
-import { type Address, encodeAbiParameters } from 'viem';
+import { useAccount, useChainId, useSwitchChain, useWriteContract, useReadContract, useSendTransaction } from 'wagmi';
+import { type Address, encodeAbiParameters, encodeDeployData } from 'viem';
 import { base } from 'wagmi/chains';
 import { useState } from 'react';
 import { HOUSE_REGISTRY_ABI, LIL_ROUND_ABI } from '@/lib/contracts/abis';
@@ -204,7 +204,7 @@ export function useCreateHouseOnChain() {
 
 /** Deploy a new LilRound contract */
 export function useCreateRoundOnChain() {
-  const { deployContractAsync, isPending } = useDeployContract();
+  const { sendTransactionAsync, isPending } = useSendTransaction();
   const chainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
   const [error, setError] = useState<string | null>(null);
@@ -221,11 +221,12 @@ export function useCreateRoundOnChain() {
     setError(null);
     if (chainId !== base.id) await switchChainAsync({ chainId: base.id });
     try {
-      return await deployContractAsync({
+      const data = encodeDeployData({
         abi: LIL_ROUND_ABI,
         bytecode: LilRoundArtifact.bytecode.object as `0x${string}`,
         args: [owner, BigInt(houseId), title, description, BigInt(numWinners), BigInt(proposalDuration), BigInt(voteDuration)],
       });
+      return await sendTransactionAsync({ data });
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
       throw e;
@@ -245,7 +246,6 @@ export function useProposeOnChain() {
     title: string,
     content: string,
     tldr: string,
-    requestedAmount: number,
   ) {
     setError(null);
     try {
@@ -253,7 +253,7 @@ export function useProposeOnChain() {
         address: roundAddress as Address,
         abi: LIL_ROUND_ABI,
         functionName: 'propose',
-        args: [title, content, tldr, BigInt(requestedAmount)],
+        args: [title, content, tldr],
       });
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');

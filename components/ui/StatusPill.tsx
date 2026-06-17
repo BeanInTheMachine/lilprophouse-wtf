@@ -38,7 +38,7 @@ export default function StatusPill({ state, className = '' }: StatusPillProps) {
 
   return (
     <span
-      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold tracking-wide ${config.bg} ${config.text} ${className}`}
+      className={`inline-flex items-center px-3 py-1 rounded-full text-base font-bold tracking-wide ${config.bg} ${config.text} ${className}`}
     >
       {config.label}
     </span>

@@ -5,16 +5,14 @@ import Button from '@/components/ui/Button';
 import { useState } from 'react';
 
 interface ProposalEditorProps {
-  onSubmit: (data: { title: string; tldr: string; content: string; reqAmount?: number }) => void;
+  onSubmit: (data: { title: string; tldr: string; content: string }) => void;
   isLoading?: boolean;
-  showReqAmount?: boolean;
 }
 
-export default function ProposalEditor({ onSubmit, isLoading = false, showReqAmount = false }: ProposalEditorProps) {
+export default function ProposalEditor({ onSubmit, isLoading = false }: ProposalEditorProps) {
   const [title, setTitle] = useState('');
   const [tldr, setTldr] = useState('');
   const [content, setContent] = useState('');
-  const [reqAmount, setReqAmount] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function validate() {
@@ -24,10 +22,6 @@ export default function ProposalEditor({ onSubmit, isLoading = false, showReqAmo
     if (!tldr.trim()) errs.tldr = 'TLDR is required';
     if (tldr.length > 256) errs.tldr = 'TLDR must be under 256 characters';
     if (!content.trim()) errs.content = 'Proposal body is required';
-    if (showReqAmount && reqAmount) {
-      const n = Number(reqAmount);
-      if (isNaN(n) || n <= 0) errs.reqAmount = 'Enter a valid positive amount';
-    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -39,7 +33,6 @@ export default function ProposalEditor({ onSubmit, isLoading = false, showReqAmo
       title: title.trim(),
       tldr: tldr.trim(),
       content: content.trim(),
-      reqAmount: reqAmount ? Number(reqAmount) : undefined,
     });
   }
 
@@ -76,18 +69,6 @@ export default function ProposalEditor({ onSubmit, isLoading = false, showReqAmo
         textarea
         rows={10}
       />
-
-      {showReqAmount && (
-        <InputFormGroup
-          label="Funding Request Amount"
-          name="reqAmount"
-          type="number"
-          value={reqAmount}
-          onChange={(e) => setReqAmount(e.target.value)}
-          placeholder="0.00"
-          error={errors.reqAmount}
-        />
-      )}
 
       <div className="flex justify-end mt-2">
         <Button onClick={handleSubmit} disabled={isLoading}>

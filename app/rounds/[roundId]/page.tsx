@@ -38,7 +38,7 @@ const STATE_BANNERS: Record<string, { title: string; message: string; variant: '
 };
 
 const BANNER_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  success: { bg: 'bg-brand-green-hint', border: 'border-brand-green-semi-transparent', text: 'text-brand-green' },
+  success: { bg: 'bg-white', border: 'border-brand-green-semi-transparent', text: 'text-brand-green' },
   info: { bg: 'bg-brand-purple-hint', border: 'border-brand-purple-semi-transparent', text: 'text-brand-purple' },
   warning: { bg: 'bg-brand-yellow-hint', border: 'border-brand-yellow-semi-transparent', text: 'text-brand-yellow' },
 };

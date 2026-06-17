@@ -44,7 +44,7 @@ export default function CreateProposalPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receipt]);
 
-  async function handleSubmit(data: { title: string; tldr: string; content: string; reqAmount?: number }) {
+  async function handleSubmit(data: { title: string; tldr: string; content: string }) {
     if (!address) return;
     setLoading(true);
     setError('');
@@ -56,7 +56,6 @@ export default function CreateProposalPage() {
           data.title.trim(),
           data.content.trim(),
           data.tldr.trim(),
-          data.reqAmount ?? 0,
         );
         setTxHash(hash);
       } catch (e: any) {
@@ -137,7 +136,7 @@ export default function CreateProposalPage() {
         )}
 
         {!txHash && (
-          <ProposalEditor onSubmit={handleSubmit} isLoading={isBusy} showReqAmount={!!roundId} />
+          <ProposalEditor onSubmit={handleSubmit} isLoading={isBusy} />
         )}
       </div>
     </ConnectToContinue>

@@ -30,7 +30,6 @@ contract LilRound {
         string title;
         string content;
         string tldr;
-        uint256 requestedAmount;
         uint256 createdAt;
         uint256 votesFor;
         uint256 votesAgainst;
@@ -153,8 +152,7 @@ contract LilRound {
     function propose(
         string calldata _title,
         string calldata _content,
-        string calldata _tldr,
-        uint256 _requestedAmount
+        string calldata _tldr
     ) external returns (uint256) {
         require(block.timestamp < proposalEndTimestamp, "Proposals closed");
         require(!cancelled && !completed, "Round not active");
@@ -170,7 +168,6 @@ contract LilRound {
             title: _title,
             content: _content,
             tldr: _tldr,
-            requestedAmount: _requestedAmount,
             createdAt: block.timestamp,
             votesFor: 0,
             votesAgainst: 0
