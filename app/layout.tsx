@@ -49,7 +49,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${londrinaSolid.variable} antialiased bg-white`}>
+      <body className={`${inter.variable} ${londrinaSolid.variable} antialiased bg-surface-lavender`}>
         <Providers>
           <div className="flex flex-col min-h-screen overflow-x-hidden">
             <Header />

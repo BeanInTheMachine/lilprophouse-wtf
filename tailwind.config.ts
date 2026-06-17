@@ -29,6 +29,7 @@ const config: Config = {
           light: '#ffffff',
           med: '#fcfcfc',
           dark: '#f5f5f5',
+          lavender: '#dbd3fd',
         },
         border: {
           light: 'rgba(0, 0, 0, 0.04)',
