@@ -548,14 +548,14 @@
 .homeHeaderImg {
   position: absolute;
   right: 0;
-  top: 0;
+  top: 6vh;
   max-height: 65vh;
   height: 65vh;
   object-fit: cover;
-  object-position: right center;
+  object-position: right top;
   width: auto;
   max-width: 55vw;
-  z-index: 1;
+  z-index: 3;
   pointer-events: none;
 }
 
@@ -572,22 +572,24 @@
 
 .homeCityImg {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 60vw;
+  right: 5%;
+  top: 10%;
+  width: 58vw;
   max-width: none;
-  z-index: 10;
+  max-height: 58vh;
+  z-index: 1;
 }
 
 .homeCitySection {
   position: relative;
   overflow: visible;
-  min-height: 30vh;
+  min-height: 68vh;
 }
 
 .homeCityTitleCol {
   position: relative;
   bottom: -6rem;
+  z-index: 2;
 }
 
 .homeStatsFlex {
@@ -607,11 +609,13 @@
 .homeStatNumber {
   font-size: 50px;
   font-weight: bold;
+  color: #fff;
 }
 
 .homeStatLabel {
   font-size: 20px;
   font-weight: bold;
+  color: rgba(255,255,255,0.8);
 }
 
 .homeFeaturesGrid {
@@ -650,12 +654,12 @@
 
 .homeHand {
   left: 0;
-  margin-top: -10vh;
+  top: -18vh;
 }
 
 .homeMoon {
   right: 0;
-  margin-top: -10vh;
+  top: -18vh;
 }
 
 .homeExploreSection {
@@ -663,20 +667,21 @@
   z-index: 0;
   padding-top: 4rem;
   padding-bottom: 6rem;
+  min-height: 30vh;
 }
 
 @media (min-width: 1200px) and (max-width: 1600px) {
   .homeStatsContainer { margin-top: -25vh; }
   .homeHeaderImg { height: 55vh; max-height: 55vh; }
-  .homeHand { margin-top: -7vh; }
-  .homeMoon { margin-top: -7vh; }
+  .homeHand { top: -14vh; }
+  .homeMoon { top: -14vh; }
 }
 
 @media (min-width: 992px) and (max-width: 1200px) {
   .homeStatsContainer { margin-top: -30vh; }
   .homeHeaderImg { height: 50vh; max-height: 50vh; }
-  .homeHand { margin-top: -4vh; }
-  .homeMoon { margin-top: -4vh; }
+  .homeHand { top: -12vh; }
+  .homeMoon { top: -12vh; }
 }
 
 @media (max-width: 992px) {
@@ -717,7 +722,7 @@
   .homeStatNumber { font-size: 20px; }
   .homeStatLabel { font-size: 12px; }
   .homeStatsFlex { gap: 20px; }
-  .homeHand { margin-top: -5vh; }
-  .homeMoon { margin-top: -5vh; }
+  .homeHand { top: -10vh; }
+  .homeMoon { top: -10vh; }
   .homeFeaturesGrid { grid-template-columns: 1fr; }
 }

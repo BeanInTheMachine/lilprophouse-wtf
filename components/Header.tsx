@@ -10,7 +10,7 @@ export default function Header() {
   const { isConnected } = useAccount();
 
   return (
-    <header className="border-b border-border-light bg-surface-light">
+    <header className="border-b border-border-light bgLightPurple">
       <div className="container mx-auto flex items-center justify-between px-4" style={{ paddingTop: '0.5rem', paddingBottom: '0.75rem' }}>
         <Link href="/" className="flex items-center gap-2.5 no-underline">
           <Image src="/bulb.png" alt="Prop House" width={45} height={45} className="h-[45px] w-auto" unoptimized />

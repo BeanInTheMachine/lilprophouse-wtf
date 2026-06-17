@@ -7,16 +7,16 @@ const FOOTER_LINKS = [
 
 export default function Footer() {
   return (
-    <footer className="pt-24 pb-12 flex justify-center items-end border-0">
-      <nav className="flex gap-2.5 text-sm font-bold text-brand-pink">
+    <footer className="pt-8 pb-12 flex justify-center items-end border-0 bg-brand-purple">
+      <nav className="flex gap-2.5 text-sm font-bold text-white/80">
         {FOOTER_LINKS.map((link, i) => (
           <span key={link.label} className="flex items-center gap-2.5">
-            {i > 0 && <span className="text-brand-pink">·</span>}
+            {i > 0 && <span className="text-white/60">·</span>}
             <a
               href={link.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-brand-pink hover:underline"
+              className="text-white/80 hover:text-white transition-colors"
             >
               {link.label}
             </a>
