@@ -6,7 +6,7 @@ import { base } from 'wagmi/chains';
 import { useState } from 'react';
 import { HOUSE_REGISTRY_ABI, LIL_ROUND_ABI } from '@/lib/contracts/abis';
 import { HOUSE_REGISTRY_ADDRESS } from '@/lib/contracts/addresses';
-import LilRoundArtifact from '@/contracts/out/LilRound.sol/LilRound.json';
+import LilRoundArtifact from '@/out/LilRound.sol/LilRound.json';
 
 const APPROVE_ABI = [
   {

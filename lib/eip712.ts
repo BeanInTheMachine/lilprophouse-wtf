@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 export const DOMAIN_SEPARATOR = {
   name: 'Prop House',
   version: '1',
-  chainId: 1,
+  chainId: 8453,
 } as const;
 
 export const PROPOSAL_MESSAGE_TYPES = {

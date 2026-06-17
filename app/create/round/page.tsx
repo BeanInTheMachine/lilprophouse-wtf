@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAccount, useSignTypedData, useWaitForTransactionReceipt } from 'wagmi';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { post } from '@/lib/api-client';
 import { DOMAIN_SEPARATOR, PROPOSAL_MESSAGE_TYPES } from '@/lib/eip712';
 import { useCreateRoundOnChain } from '@/lib/hooks/useOnChain';
@@ -34,6 +34,7 @@ export default function CreateRoundPage() {
 
   const [isCreating, setIsCreating] = useState(false);
   const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
+  const hasStored = useRef(false);
   const { signTypedDataAsync } = useSignTypedData();
   const { createRound, isPending: isDeploying } = useCreateRoundOnChain();
   const { data: receipt } = useWaitForTransactionReceipt({ hash: txHash ?? undefined });
@@ -81,7 +82,8 @@ export default function CreateRoundPage() {
   }
 
   async function storeRoundInDb(contractAddress?: string) {
-    if (!address) return;
+    if (!address || hasStored.current) return;
+    hasStored.current = true;
 
     const payload = {
       title: round.title,
@@ -135,12 +137,13 @@ export default function CreateRoundPage() {
 
   // When tx is confirmed (and not skipped), store metadata in DB and navigate
   useEffect(() => {
-    if (!receipt || !txHash || !address || process.env.NEXT_PUBLIC_SKIP_ONCHAIN === 'true') return;
+    if (!receipt || !txHash || !address || hasStored.current || process.env.NEXT_PUBLIC_SKIP_ONCHAIN === 'true') return;
 
     const contractAddress = receipt.contractAddress ?? undefined;
     storeRoundInDb(contractAddress).catch((err) => {
       alert(err.message ?? 'Failed to store round');
       setIsCreating(false);
+      hasStored.current = false;
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receipt]);
