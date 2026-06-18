@@ -32,7 +32,7 @@ export default function Header() {
             showBalance={false}
             label="Connect"
             accountStatus="avatar"
-            chainStatus="icon"
+            chainStatus="none"
           />
 
           {admin && (
