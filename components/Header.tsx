@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { useAccount } from 'wagmi';
+import { isAdmin } from '@/lib/admin';
 import { ConnectButton as RainbowConnectButton } from '@rainbow-me/rainbowkit';
-import { IoSettingsSharp } from 'react-icons/io5';
+import { IoSettingsSharp, IoShieldCheckmarkSharp } from 'react-icons/io5';
 import Image from 'next/image';
 
 export default function Header() {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
+  const admin = isAdmin(address);
 
   return (
     <header className="border-b border-border-light bgLightPurple">
@@ -32,6 +34,15 @@ export default function Header() {
             accountStatus="avatar"
             chainStatus="icon"
           />
+
+          {admin && (
+            <Link
+              href="/admin"
+              className="inline-flex items-center justify-center rounded-[10px] px-3 py-1.5 text-sm font-bold text-brand-purple bg-brand-purple-hint border border-brand-purple hover:bg-brand-purple-semi-transparent transition-colors h-10 no-underline"
+            >
+              <IoShieldCheckmarkSharp />
+            </Link>
+          )}
 
           <Link
             href="/dashboard"

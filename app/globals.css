@@ -726,3 +726,14 @@
   .homeMoon { top: -10vh; }
   .homeFeaturesGrid { grid-template-columns: 1fr; }
 }
+
+/* ============================================
+   RainbowKit — purple connect button
+   ============================================ */
+[data-rk] {
+  --rk-colors-accentColor: #8a2be2 !important;
+  --rk-colors-accentColorForeground: #ffffff !important;
+  --rk-colors-connectButtonBackground: #8a2be2 !important;
+  --rk-colors-connectButtonText: #ffffff !important;
+  --rk-colors-connectButtonBackgroundError: #DC2626 !important;
+}

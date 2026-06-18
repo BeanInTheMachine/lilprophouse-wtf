@@ -59,3 +59,15 @@ export async function getCompletedRounds() {
     orderBy: { updatedAt: 'desc' },
   });
 }
+
+export async function getAllRounds() {
+  return prisma.round.findMany({
+    include: {
+      proposals: {
+        where: { deletedAt: null },
+      },
+      house: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}

@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useAccount, useEnsName } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
-import { useRoundChainState, useVoteOnChain } from '@/lib/hooks/useOnChain';
+import { useRoundChainState, useVoteOnChain, useDepositorsOnChain } from '@/lib/hooks/useOnChain';
 import RewardsDisplay from '@/components/round/RewardsDisplay';
 import Link from 'next/link';
 import dayjs from 'dayjs';
@@ -43,6 +43,15 @@ const BANNER_COLORS: Record<string, { bg: string; border: string; text: string }
   warning: { bg: 'bg-brand-yellow-hint', border: 'border-brand-yellow-semi-transparent', text: 'text-brand-yellow' },
 };
 
+function FunderAddress({ address }: { address: string }) {
+  const { data: ens } = useEnsName({ address: address as `0x${string}`, chainId: 1 });
+  return (
+    <p className="font-bold text-sm text-brand-black">
+      {ens ?? `${address.slice(0, 6)}...${address.slice(-4)}`}
+    </p>
+  );
+}
+
 export default function RoundPage() {
   const params = useParams<{ roundId: string }>();
   const roundId = parseInt(params.roundId, 10);
@@ -51,6 +60,7 @@ export default function RoundPage() {
   const chainAddress = (round?.contractAddress as `0x${string}` | undefined) ?? '0x0000000000000000000000000000000000000000';
   const { state: chainState, owner: chainOwner, totalDeposited } = useRoundChainState(chainAddress);
   const { vote, isPending: voting } = useVoteOnChain();
+  const { depositors } = useDepositorsOnChain(round?.contractAddress ?? undefined);
   const [votingPropId, setVotingPropId] = useState<number | null>(null);
 
   const [now, setNow] = useState(Date.now());
@@ -199,10 +209,21 @@ export default function RoundPage() {
           </p>
         </div>
         <div className="bg-surface-dark rounded-xl p-4 text-center">
-          <p className="text-xs text-brand-gray font-bold uppercase tracking-wider mb-1">Strategy</p>
-          <p className="font-londrina text-lg text-brand-black">
-            {round.propStrategyDescription ?? 'Open'}
-          </p>
+          <p className="text-xs text-brand-gray font-bold uppercase tracking-wider mb-1">Funded By</p>
+          {depositors.length > 0 ? (
+            <div className="flex flex-col gap-0.5 items-center">
+              {depositors.slice(0, 5).map((d) => (
+                <FunderAddress key={d} address={d} />
+              ))}
+              {depositors.length > 5 && (
+                <p className="text-xs text-brand-gray">+{depositors.length - 5} more</p>
+              )}
+            </div>
+          ) : (
+            <p className="font-londrina text-lg text-brand-black">
+              {round.contractAddress ? 'None yet' : '—'}
+            </p>
+          )}
         </div>
       </div>
 

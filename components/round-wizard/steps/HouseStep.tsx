@@ -167,6 +167,8 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
   const mergedHouses = useMemo(() => {
     const map = new Map<string, MergedHouse>();
 
+    const hasDbHouses = (dbHouses ?? []).some((h) => h.contractAddress && isAddress(h.contractAddress));
+
     // Add DB houses first
     for (const h of dbHouses ?? []) {
       if (!h.contractAddress || !isAddress(h.contractAddress)) continue;
@@ -184,27 +186,24 @@ export default function HouseStep({ onSelectHouse }: HouseStepProps) {
       });
     }
 
-    // Add on-chain houses, merging with existing DB entries
-    for (const houseId of chainHouseIds ?? []) {
-      const key = String(houseId);
-      const existing = map.get(key);
-
-      if (existing) {
-        existing.source = 'both';
-      } else {
-        // On-chain house without DB record — show with loading metadata
-        map.set(key, {
-          id: houseId,
-          address: String(houseId),
-          name: '(Loading...)',
-          image: '',
-          description: '',
-          contractURI: '',
-          existingHouse: true,
-          roundCount: 0,
-          source: 'chain',
-          loading: true,
-        });
+    // Only show on-chain houses if no DB houses exist (prevents ghost duplicates)
+    if (!hasDbHouses) {
+      for (const houseId of chainHouseIds ?? []) {
+        const key = String(houseId);
+        if (!map.has(key)) {
+          map.set(key, {
+            id: houseId,
+            address: String(houseId),
+            name: '(Loading...)',
+            image: '',
+            description: '',
+            contractURI: '',
+            existingHouse: true,
+            roundCount: 0,
+            source: 'chain',
+            loading: true,
+          });
+        }
       }
     }
 

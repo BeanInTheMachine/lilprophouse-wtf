@@ -1,9 +1,9 @@
 'use client';
 
 import { useAccount, useChainId, useSwitchChain, useWriteContract, useReadContract, useSendTransaction } from 'wagmi';
-import { type Address, encodeAbiParameters, encodeDeployData } from 'viem';
+import { type Address, encodeAbiParameters, encodeDeployData, createPublicClient, http, parseAbi } from 'viem';
 import { base } from 'wagmi/chains';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HOUSE_REGISTRY_ABI, LIL_ROUND_ABI } from '@/lib/contracts/abis';
 import { HOUSE_REGISTRY_ADDRESS } from '@/lib/contracts/addresses';
 import LilRoundArtifact from '@/out/LilRound.sol/LilRound.json';
@@ -547,4 +547,50 @@ export function useSetWinnerNfts() {
   }
 
   return { setWinnerNfts, isPending, error };
+}
+
+/** Get depositor addresses from a round contract */
+export function useDepositorsOnChain(roundAddress?: string) {
+  const [depositors, setDepositors] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!roundAddress) { setDepositors([]); return; }
+
+    let cancelled = false;
+    setLoading(true);
+
+    (async () => {
+      try {
+        const client = createPublicClient({
+          chain: base,
+          transport: http(process.env.NEXT_PUBLIC_BASE_RPC_URL ?? 'https://mainnet.base.org'),
+        });
+
+        const logs = await client.getLogs({
+          address: roundAddress as Address,
+          event: parseAbi(['event DepositReceived(address indexed depositor, uint256 amount)'])[0],
+          fromBlock: 0n,
+        });
+
+        if (cancelled) return;
+
+        const addrs = new Set<string>();
+        for (const log of logs) {
+          if (log.args?.depositor) {
+            addrs.add((log.args.depositor as string).toLowerCase());
+          }
+        }
+        setDepositors(Array.from(addrs));
+      } catch {
+        /* event fetch failed — likely RPC doesn't support getLogs for old blocks */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [roundAddress]);
+
+  return { depositors, loading };
 }

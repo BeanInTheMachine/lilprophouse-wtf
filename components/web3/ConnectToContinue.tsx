@@ -16,7 +16,9 @@ export default function ConnectToContinue({ children, fallback }: ConnectToConti
       fallback ?? (
         <div className="text-center py-16">
           <p className="text-brand-gray text-lg mb-4">Connect your wallet to continue</p>
-          <ConnectButton />
+          <div className="flex justify-center">
+            <ConnectButton />
+          </div>
         </div>
       )
     );
