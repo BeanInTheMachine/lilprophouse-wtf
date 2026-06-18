@@ -153,7 +153,7 @@ export default function RoundPage() {
             href={`/rounds/${roundId}/manage`}
             className="ml-auto inline-flex items-center justify-center rounded-[10px] px-3 py-1.5 text-sm font-bold text-brand-purple border border-brand-purple hover:bg-brand-purple-hint transition-colors"
           >
-            Manage
+            Fund This Round
           </Link>
         </div>
 

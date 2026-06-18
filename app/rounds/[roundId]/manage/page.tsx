@@ -369,7 +369,7 @@ export default function RoundManagerPage() {
         &larr; Back to round
       </Link>
 
-      <h1 className="font-londrina text-3xl text-brand-black mb-2">Manage Round</h1>
+      <h1 className="font-londrina text-3xl text-brand-black mb-2">Fund This Round</h1>
       <p className="text-brand-gray mb-8">{round.title}</p>
 
       {actionError && (
