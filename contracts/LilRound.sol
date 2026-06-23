@@ -107,6 +107,7 @@ contract LilRound {
     event RoundStateChanged(State newState);
     event ProposalSubmitted(uint256 indexed proposalId, address indexed proposer, string title);
     event VoteCast(uint256 indexed proposalId, address indexed voter, uint256 weight, bool isFor);
+    event VoteAttested(uint256 indexed proposalId, address indexed voter, bytes signature);
     event WinnersSet(uint256[] proposalIds, uint256[] awardIndices);
     event AwardClaimed(uint256 indexed proposalId, address indexed winner, uint256 amount);
     event DepositReceived(address indexed depositor, uint256 amount);
@@ -294,6 +295,11 @@ contract LilRound {
         }
 
         emit VoteCast(_proposalId, msg.sender, _weight, _isFor);
+    }
+
+    function attestVote(uint256 _proposalId, bytes calldata _signature) external {
+        require(hasVotedOn[_proposalId][msg.sender], "Must have voted on this proposal");
+        emit VoteAttested(_proposalId, msg.sender, _signature);
     }
 
     function claim(uint256 _proposalId) external {

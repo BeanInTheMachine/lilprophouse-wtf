@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAccount } from 'wagmi';
 import { useProposal, useRound } from '@/lib/hooks/useApi';
-import { useVoteOnChain, useVoteWithProofOnChain, useHasVotedOn } from '@/lib/hooks/useOnChain';
+import { useVoteOnChain, useVoteWithProofOnChain, useHasVotedOn, useAttestVote, useProposalOnChain } from '@/lib/hooks/useOnChain';
 import { useSubmitVotes } from '@/lib/hooks/useMutations';
 import { buildMerkleTree, generateMerkleProof } from '@/lib/merkle';
 import { useSignTypedData, useWaitForTransactionReceipt } from 'wagmi';
@@ -22,6 +22,11 @@ export default function ProposalPage() {
   const { vote, isPending: voting } = useVoteOnChain();
   const { voteWithProof } = useVoteWithProofOnChain();
   const { submitVotes } = useSubmitVotes();
+  const { attestVote } = useAttestVote();
+  const { proposal: onChainProposal } = useProposalOnChain(
+    round?.contractAddress ?? undefined,
+    proposal?.onChainIndex ?? undefined,
+  );
   const { signTypedDataAsync } = useSignTypedData();
   const [votingStatus, setVotingStatus] = useState<'for' | 'against' | 'abstain' | null>(null);
   const [voteTxHash, setVoteTxHash] = useState<`0x${string}` | null>(null);
@@ -64,6 +69,9 @@ export default function ProposalPage() {
           signature,
           signedMessage: Buffer.from(signedMessageString).toString('base64'),
         }]);
+        if (round.contractAddress) {
+          try { await attestVote(round.contractAddress, proposalId, signature); } catch { /* best-effort */ }
+        }
       } catch {
         // DB sync is best-effort
       }
@@ -96,9 +104,13 @@ export default function ProposalPage() {
     );
   }
 
-  const totalVotes = proposal.voteCountFor + proposal.voteCountAgainst;
-  const forPercent = totalVotes > 0 ? (proposal.voteCountFor / totalVotes) * 100 : 0;
-  const againstPercent = totalVotes > 0 ? (proposal.voteCountAgainst / totalVotes) * 100 : 0;
+  const chainVotesFor = onChainProposal ? Number(onChainProposal.votesFor ?? 0) : null;
+  const chainVotesAgainst = onChainProposal ? Number(onChainProposal.votesAgainst ?? 0) : null;
+  const displayVotesFor = chainVotesFor ?? proposal.voteCountFor;
+  const displayVotesAgainst = chainVotesAgainst ?? proposal.voteCountAgainst;
+  const totalVotes = displayVotesFor + displayVotesAgainst;
+  const forPercent = totalVotes > 0 ? (displayVotesFor / totalVotes) * 100 : 0;
+  const againstPercent = totalVotes > 0 ? (displayVotesAgainst / totalVotes) * 100 : 0;
 
   async function handleVote(direction: 'for' | 'against' | 'abstain') {
     if (!round?.contractAddress || !wallet) return;
@@ -216,7 +228,7 @@ export default function ProposalPage() {
               />
             </div>
             <span className="text-sm font-bold text-brand-black w-20 text-right">
-              {proposal.voteCountFor} ({Math.round(forPercent)}%)
+              {displayVotesFor} ({Math.round(forPercent)}%)
             </span>
           </div>
 
@@ -229,7 +241,7 @@ export default function ProposalPage() {
               />
             </div>
             <span className="text-sm font-bold text-brand-black w-20 text-right">
-              {proposal.voteCountAgainst} ({Math.round(againstPercent)}%)
+              {displayVotesAgainst} ({Math.round(againstPercent)}%)
             </span>
           </div>
 

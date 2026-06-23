@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useAccount, useEnsName, useSignTypedData, useWaitForTransactionReceipt } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
-import { useRoundChainState, useVoteOnChain, useVoteWithProofOnChain, useHasVotedOn, useDepositorsOnChain } from '@/lib/hooks/useOnChain';
+import { useRoundChainState, useVoteOnChain, useVoteWithProofOnChain, useHasVotedOn, useDepositorsOnChain, useAttestVote, useProposalsOnChain } from '@/lib/hooks/useOnChain';
 import { useSubmitVotes } from '@/lib/hooks/useMutations';
 import { buildMerkleTree, generateMerkleProof } from '@/lib/merkle';
 import { DOMAIN_SEPARATOR, VOTE_MESSAGE_TYPES } from '@/lib/eip712';
@@ -56,6 +56,98 @@ function FunderAddress({ address }: { address: string }) {
   );
 }
 
+interface ProposalCardProps {
+  proposal: any;
+  round: any;
+  wallet: string | undefined;
+  effectiveState: string;
+  votingPropId: number | null;
+  votingDirection: 'for' | 'against' | 'abstain' | null;
+  onVote: (proposal: any, direction: 'for' | 'against' | 'abstain') => void;
+  getVoteCounts: (proposal: any) => { votesFor: number; votesAgainst: number };
+}
+
+function ProposalCard({ proposal, round, wallet, effectiveState, votingPropId, votingDirection, onVote, getVoteCounts }: ProposalCardProps) {
+  const chainCounts = getVoteCounts(proposal);
+  const totalVotes = chainCounts.votesFor + chainCounts.votesAgainst;
+  const forPercent = totalVotes > 0 ? (chainCounts.votesFor / totalVotes) * 100 : 0;
+  const isVoting = effectiveState === 'VOTING';
+  const { hasVoted } = useHasVotedOn(
+    round?.contractAddress ?? undefined,
+    proposal.id,
+    wallet ?? undefined,
+  );
+
+  return (
+    <div
+      className="bg-surface-light border border-border-light rounded-2xl p-5 shadow-low hover:shadow-high transition-all duration-150 ease-out"
+    >
+      <Link href={`/proposals/${proposal.id}`} className="block no-underline">
+        <h3 className="font-bold text-base text-brand-black mb-1">{proposal.title}</h3>
+        <p className="text-sm text-brand-gray line-clamp-2 mb-3">{proposal.tldr}</p>
+        <div className="flex items-center gap-4 text-sm">
+          <span className="text-brand-gray">
+            by <span className="font-medium text-brand-black font-mono text-xs">{proposal.address.slice(0, 6)}...{proposal.address.slice(-4)}</span>
+          </span>
+          {totalVotes > 0 && (
+            <>
+              <span className="text-brand-gray">&middot;</span>
+              <div className="flex items-center gap-2">
+                <div className="w-20 h-2 bg-border-light rounded-full overflow-hidden">
+                  <div className="h-full bg-brand-purple rounded-full" style={{ width: `${forPercent}%` }} />
+                </div>
+                <span className="text-xs text-brand-gray">
+                  {chainCounts.votesFor} / {totalVotes}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      </Link>
+      {isVoting && round.contractAddress && wallet && (
+        <div className="flex gap-2 mt-3 pt-3 border-t border-border-light">
+          {hasVoted ? (
+            <span className="text-sm font-bold text-brand-purple py-1.5">Voted</span>
+          ) : (
+            <>
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  await onVote(proposal, 'for');
+                }}
+                disabled={votingPropId !== null}
+                className="flex-1 px-3 py-1.5 rounded-[10px] text-sm font-bold text-white bg-brand-green hover:opacity-90 transition-colors disabled:opacity-50"
+              >
+                {votingPropId === proposal.id && votingDirection === 'for' ? 'Voting...' : 'Vote For'}
+              </button>
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  await onVote(proposal, 'against');
+                }}
+                disabled={votingPropId !== null}
+                className="flex-1 px-3 py-1.5 rounded-[10px] text-sm font-bold text-white bg-brand-red hover:opacity-90 transition-colors disabled:opacity-50"
+              >
+                {votingPropId === proposal.id && votingDirection === 'against' ? 'Voting...' : 'Vote Against'}
+              </button>
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  await onVote(proposal, 'abstain');
+                }}
+                disabled={votingPropId !== null}
+                className="px-3 py-1.5 rounded-[10px] text-sm font-bold text-brand-gray bg-surface-dark hover:bg-border-light transition-colors disabled:opacity-50"
+              >
+                {votingPropId === proposal.id && votingDirection === 'abstain' ? '...' : 'Abstain'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function RoundPage() {
   const params = useParams<{ roundId: string }>();
   const roundId = parseInt(params.roundId, 10);
@@ -66,6 +158,8 @@ export default function RoundPage() {
   const { vote, isPending: voting } = useVoteOnChain();
   const { voteWithProof } = useVoteWithProofOnChain();
   const { submitVotes } = useSubmitVotes();
+  const { attestVote } = useAttestVote();
+  const { proposals: onChainProposals } = useProposalsOnChain(round?.contractAddress ?? undefined);
   const { signTypedDataAsync } = useSignTypedData();
   const { depositors } = useDepositorsOnChain(round?.contractAddress ?? undefined);
   const [votingPropId, setVotingPropId] = useState<number | null>(null);
@@ -108,6 +202,9 @@ export default function RoundPage() {
           signature,
           signedMessage: Buffer.from(signedMessageString).toString('base64'),
         }]);
+        if (round.contractAddress) {
+          try { await attestVote(round.contractAddress, votingPropId, signature); } catch { /* best-effort */ }
+        }
       } catch {
         // DB sync is best-effort; on-chain vote already succeeded
       }
@@ -218,6 +315,23 @@ export default function RoundPage() {
   const colors = BANNER_COLORS[banner.variant];
   const proposals = round.proposals ?? [];
   const isAccepting = effectiveState === 'ACCEPTING_PROPOSALS';
+
+  const onChainVoteCounts: Record<number, { votesFor: number; votesAgainst: number }> = {};
+  if (onChainProposals && Array.isArray(onChainProposals)) {
+    for (let i = 0; i < onChainProposals.length; i++) {
+      const p = onChainProposals[i];
+      if (p) {
+        onChainVoteCounts[i] = { votesFor: Number(p.votesFor ?? 0), votesAgainst: Number(p.votesAgainst ?? 0) };
+      }
+    }
+  }
+
+  function getVoteCounts(proposal: any) {
+    if (proposal.onChainIndex !== null && proposal.onChainIndex !== undefined && onChainVoteCounts[proposal.onChainIndex]) {
+      return onChainVoteCounts[proposal.onChainIndex];
+    }
+    return { votesFor: proposal.voteCountFor, votesAgainst: proposal.voteCountAgainst };
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -367,86 +481,19 @@ export default function RoundPage() {
           </div>
         ) : (
           <div className="grid gap-4">
-            {proposals.map((proposal: any) => {
-              const totalVotes = proposal.voteCountFor + proposal.voteCountAgainst;
-              const forPercent = totalVotes > 0 ? (proposal.voteCountFor / totalVotes) * 100 : 0;
-              const isVoting = effectiveState === 'VOTING';
-              const { hasVoted } = useHasVotedOn(
-                round?.contractAddress ?? undefined,
-                proposal.id,
-                wallet ?? undefined,
-              );
-
-              return (
-                <div
-                  key={proposal.id}
-                  className="bg-surface-light border border-border-light rounded-2xl p-5 shadow-low hover:shadow-high transition-all duration-150 ease-out"
-                >
-                  <Link href={`/proposals/${proposal.id}`} className="block no-underline">
-                    <h3 className="font-bold text-base text-brand-black mb-1">{proposal.title}</h3>
-                    <p className="text-sm text-brand-gray line-clamp-2 mb-3">{proposal.tldr}</p>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-brand-gray">
-                        by <span className="font-medium text-brand-black font-mono text-xs">{proposal.address.slice(0, 6)}...{proposal.address.slice(-4)}</span>
-                      </span>
-                      {totalVotes > 0 && (
-                        <>
-                          <span className="text-brand-gray">&middot;</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-20 h-2 bg-border-light rounded-full overflow-hidden">
-                              <div className="h-full bg-brand-purple rounded-full" style={{ width: `${forPercent}%` }} />
-                            </div>
-                            <span className="text-xs text-brand-gray">
-                              {proposal.voteCountFor} / {totalVotes}
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </Link>
-                  {isVoting && round.contractAddress && wallet && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-border-light">
-                      {hasVoted ? (
-                        <span className="text-sm font-bold text-brand-purple py-1.5">Voted</span>
-                      ) : (
-                        <>
-                          <button
-                            onClick={async (e) => {
-                              e.preventDefault();
-                              await handleVoteOnProposal(proposal, 'for');
-                            }}
-                            disabled={votingPropId !== null}
-                            className="flex-1 px-3 py-1.5 rounded-[10px] text-sm font-bold text-white bg-brand-green hover:opacity-90 transition-colors disabled:opacity-50"
-                          >
-                            {votingPropId === proposal.id && votingDirection === 'for' ? 'Voting...' : 'Vote For'}
-                          </button>
-                          <button
-                            onClick={async (e) => {
-                              e.preventDefault();
-                              await handleVoteOnProposal(proposal, 'against');
-                            }}
-                            disabled={votingPropId !== null}
-                            className="flex-1 px-3 py-1.5 rounded-[10px] text-sm font-bold text-white bg-brand-red hover:opacity-90 transition-colors disabled:opacity-50"
-                          >
-                            {votingPropId === proposal.id && votingDirection === 'against' ? 'Voting...' : 'Vote Against'}
-                          </button>
-                          <button
-                            onClick={async (e) => {
-                              e.preventDefault();
-                              await handleVoteOnProposal(proposal, 'abstain');
-                            }}
-                            disabled={votingPropId !== null}
-                            className="px-3 py-1.5 rounded-[10px] text-sm font-bold text-brand-gray bg-surface-dark hover:bg-border-light transition-colors disabled:opacity-50"
-                          >
-                            {votingPropId === proposal.id && votingDirection === 'abstain' ? '...' : 'Abstain'}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {proposals.map((proposal: any) => (
+              <ProposalCard
+                key={proposal.id}
+                proposal={proposal}
+                round={round}
+                wallet={wallet}
+                effectiveState={effectiveState}
+                votingPropId={votingPropId}
+                votingDirection={votingDirection}
+                onVote={handleVoteOnProposal}
+                getVoteCounts={getVoteCounts}
+              />
+            ))}
           </div>
         )}
       </section>

@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
+import { decodeEventLog } from 'viem';
+import { LIL_ROUND_ABI } from '@/lib/contracts/abis';
 import ProposalEditor from '@/components/proposal/ProposalEditor';
 import ConnectToContinue from '@/components/web3/ConnectToContinue';
 import { useProposeOnChain } from '@/lib/hooks/useOnChain';
@@ -31,6 +33,16 @@ export default function CreateProposalPage() {
     const data = proposalRef.current;
     (async () => {
       try {
+        let onChainIndex: number | undefined;
+        for (const log of receipt.logs) {
+          try {
+            const decoded = decodeEventLog({ abi: LIL_ROUND_ABI, data: log.data, topics: log.topics });
+            if (decoded.eventName === 'ProposalSubmitted' && decoded.args) {
+              onChainIndex = Number((decoded.args as any).proposalId);
+              break;
+            }
+          } catch { /* skip non-matching logs */ }
+        }
         await post('/api/proposals', {
           title: data.title,
           content: data.content,
@@ -38,6 +50,7 @@ export default function CreateProposalPage() {
           address,
           roundId: Number(roundId),
           reqAmount: 0,
+          onChainIndex,
         });
         router.push(`/rounds/${roundId}`);
       } catch (e: any) {

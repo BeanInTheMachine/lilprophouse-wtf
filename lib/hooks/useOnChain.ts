@@ -343,6 +343,30 @@ export function useVoteWithProofOnChain() {
   return { voteWithProof, isPending, error };
 }
 
+/** Attest an on-chain vote with its EIP-712 signature.
+ *  Stores the signature permanently as a VoteAttested event log. */
+export function useAttestVote() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  async function attestVote(roundAddress: string, proposalId: number, signature: `0x${string}`) {
+    setError(null);
+    try {
+      return await writeContractAsync({
+        address: roundAddress as Address,
+        abi: LIL_ROUND_ABI,
+        functionName: 'attestVote',
+        args: [BigInt(proposalId), signature],
+      });
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { attestVote, isPending, error };
+}
+
 /** Deposit ETH into a round via LilRound.deposit */
 export function useDepositToRound() {
   const { writeContractAsync, isPending } = useWriteContract();

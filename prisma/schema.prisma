@@ -76,6 +76,7 @@ model Proposal {
   voteCountFor    Int      @default(0)
   voteCountAgainst Int     @default(0)
   deletedAt       DateTime?
+  onChainIndex    Int?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

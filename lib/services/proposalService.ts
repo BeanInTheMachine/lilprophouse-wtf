@@ -7,6 +7,7 @@ interface CreateProposalInput {
   address: string;
   roundId: number;
   reqAmount?: number;
+  onChainIndex?: number;
 }
 
 export async function createProposal(input: CreateProposalInput) {
@@ -18,6 +19,7 @@ export async function createProposal(input: CreateProposalInput) {
       address: input.address.toLowerCase(),
       roundId: input.roundId,
       reqAmount: input.reqAmount ?? null,
+      onChainIndex: input.onChainIndex ?? null,
     },
     include: {
       round: {

@@ -81,6 +81,7 @@ export async function POST(request: Request) {
       address: body.address,
       roundId: body.roundId,
       reqAmount: body.reqAmount ?? undefined,
+      onChainIndex: typeof body.onChainIndex === 'number' ? body.onChainIndex : undefined,
     });
 
     return NextResponse.json(proposal, { status: 201 });
