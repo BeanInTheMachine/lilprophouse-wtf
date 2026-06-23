@@ -6,7 +6,8 @@ import { useAccount, useSignTypedData, useWaitForTransactionReceipt } from 'wagm
 import { useState, useEffect, useRef } from 'react';
 import { post } from '@/lib/api-client';
 import { DOMAIN_SEPARATOR, PROPOSAL_MESSAGE_TYPES } from '@/lib/eip712';
-import { useCreateRoundOnChain } from '@/lib/hooks/useOnChain';
+import { useCreateRoundOnChain, type AwardConfig } from '@/lib/hooks/useOnChain';
+import { buildMerkleTree } from '@/lib/merkle';
 import Card from '@/components/ui/Card';
 import ConnectToContinue from '@/components/web3/ConnectToContinue';
 import StepSidebar from '@/components/round-wizard/StepSidebar';
@@ -17,7 +18,106 @@ import VotersStep from '@/components/round-wizard/steps/VotersStep';
 import AwardsStep from '@/components/round-wizard/steps/AwardsStep';
 import DatesStep from '@/components/round-wizard/steps/DatesStep';
 import ReviewStep from '@/components/round-wizard/steps/ReviewStep';
-import { useWizardState, type HouseInfo } from '@/lib/hooks/useWizardState';
+import { useWizardState, type HouseInfo, type GovPowerStrategy, type RoundWizardState } from '@/lib/hooks/useWizardState';
+import { type Address } from 'viem';
+
+const STRATEGY_ENUM: Record<string, number> = {
+  BALANCE_OF: 0,
+  BALANCE_OF_ERC721: 0,
+  BALANCE_OF_ERC20: 1,
+  BALANCE_OF_ERC1155: 2,
+  ALLOWLIST: 3,
+};
+
+function buildVotingParams(voters: GovPowerStrategy[]) {
+  if (voters.length === 0) {
+    return {
+      voteStrategyType: 0,
+      votingToken: '0x0000000000000000000000000000000000000000',
+      votingTokenId: 0n,
+      voteMultiplier: 1n,
+      allowlistRoot: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+    };
+  }
+
+  const allowlistVoter = voters.find((v) => v.strategyType === 'ALLOWLIST');
+  if (allowlistVoter && allowlistVoter.members && allowlistVoter.members.length > 0) {
+    const members = allowlistVoter.members.map((m) => ({
+      address: m.address,
+      weight: m.govPower,
+    }));
+    const tree = buildMerkleTree(members);
+    return {
+      voteStrategyType: 3,
+      votingToken: '0x0000000000000000000000000000000000000000',
+      votingTokenId: 0n,
+      voteMultiplier: 1n,
+      allowlistRoot: tree.root,
+    };
+  }
+
+  const tokenVoter = voters.find((v) =>
+    v.strategyType !== 'ALLOWLIST' && v.address
+  );
+  if (tokenVoter) {
+    return {
+      voteStrategyType: STRATEGY_ENUM[tokenVoter.strategyType] ?? 0,
+      votingToken: tokenVoter.address,
+      votingTokenId: tokenVoter.tokenId ? BigInt(tokenVoter.tokenId) : 0n,
+      voteMultiplier: BigInt(tokenVoter.multiplier || 1),
+      allowlistRoot: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+    };
+  }
+
+  return {
+    voteStrategyType: 0,
+    votingToken: '0x0000000000000000000000000000000000000000',
+    votingTokenId: 0n,
+    voteMultiplier: 1n,
+    allowlistRoot: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+  };
+}
+
+const ASSET_TYPE_MAP: Record<string, number> = { ETH: 0, ERC20: 1, ERC721: 2, ERC1155: 3 };
+
+function buildAwardConfigs(awards: RoundWizardState['round']['awards'], numWinners: number): AwardConfig[] {
+  const saved = awards.filter((a) => a.state === 'saved');
+  if (saved.length === 0) return [];
+
+  return saved.slice(0, numWinners).map((a) => {
+    const assetType = ASSET_TYPE_MAP[a.type] ?? 0;
+    if (a.type === 'ETH') {
+      return {
+        assetType,
+        tokenAddress: '0x0000000000000000000000000000000000000000',
+        tokenId: 0n,
+        amountPerWinner: BigInt(Math.floor((a.allocated || 0) * 1e18)),
+      };
+    }
+    if (a.type === 'ERC20') {
+      return {
+        assetType,
+        tokenAddress: a.address,
+        tokenId: 0n,
+        amountPerWinner: BigInt(Math.floor((a.allocated || 0) * 1e18)),
+      };
+    }
+    if (a.type === 'ERC721') {
+      return {
+        assetType,
+        tokenAddress: a.address,
+        tokenId: a.tokenId ? BigInt(a.tokenId) : 0n,
+        amountPerWinner: 0n,
+      };
+    }
+    return {
+      assetType,
+      tokenAddress: a.address,
+      tokenId: a.tokenId ? BigInt(a.tokenId) : 0n,
+      amountPerWinner: BigInt(a.allocated || 1),
+    };
+  });
+}
 
 export default function CreateRoundPage() {
   const router = useRouter();
@@ -53,6 +153,10 @@ export default function CreateRoundPage() {
         return;
       }
 
+      const { voteStrategyType, votingToken, votingTokenId, voteMultiplier, allowlistRoot } =
+        buildVotingParams(round.voters);
+      const awardConfigs = buildAwardConfigs(round.awards, round.numWinners);
+
       try {
         const hash = await createRound(
           address,
@@ -62,6 +166,12 @@ export default function CreateRoundPage() {
           round.numWinners,
           round.proposalPeriodDurationSecs,
           round.votePeriodDurationSecs,
+          voteStrategyType,
+          votingToken,
+          votingTokenId,
+          voteMultiplier,
+          allowlistRoot,
+          awardConfigs.slice(0, round.numWinners),
         );
         setTxHash(hash);
       } catch (deployErr: any) {

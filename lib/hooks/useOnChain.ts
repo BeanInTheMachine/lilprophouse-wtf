@@ -202,6 +202,13 @@ export function useCreateHouseOnChain() {
   return { createHouse, isPending, error };
 }
 
+export interface AwardConfig {
+  assetType: number;
+  tokenAddress: string;
+  tokenId: bigint;
+  amountPerWinner: bigint;
+}
+
 /** Deploy a new LilRound contract */
 export function useCreateRoundOnChain() {
   const { sendTransactionAsync, isPending } = useSendTransaction();
@@ -217,6 +224,12 @@ export function useCreateRoundOnChain() {
     numWinners: number,
     proposalDuration: number,
     voteDuration: number,
+    voteStrategyType: number,
+    votingToken: string,
+    votingTokenId: bigint,
+    voteMultiplier: bigint,
+    allowlistRoot: `0x${string}`,
+    awardConfigs: AwardConfig[],
   ) {
     setError(null);
     if (chainId !== base.id) await switchChainAsync({ chainId: base.id });
@@ -224,7 +237,21 @@ export function useCreateRoundOnChain() {
       const data = encodeDeployData({
         abi: LIL_ROUND_ABI,
         bytecode: LilRoundArtifact.bytecode.object as `0x${string}`,
-        args: [owner, BigInt(houseId), title, description, BigInt(numWinners), BigInt(proposalDuration), BigInt(voteDuration)],
+        args: [
+          owner,
+          BigInt(houseId),
+          title,
+          description,
+          BigInt(numWinners),
+          BigInt(proposalDuration),
+          BigInt(voteDuration),
+          voteStrategyType,
+          votingToken as Address,
+          votingTokenId,
+          voteMultiplier,
+          allowlistRoot,
+          awardConfigs.map((a) => [a.assetType, a.tokenAddress as Address, a.tokenId, a.amountPerWinner]),
+        ],
       });
       return await sendTransactionAsync({ data });
     } catch (e: any) {
@@ -264,19 +291,19 @@ export function useProposeOnChain() {
   return { propose, isPending, error };
 }
 
-/** Cast a vote on-chain via LilRound.vote */
+/** Cast a vote on-chain via LilRound.vote (token-based strategies) */
 export function useVoteOnChain() {
   const { writeContractAsync, isPending } = useWriteContract();
   const [error, setError] = useState<string | null>(null);
 
-  async function vote(roundAddress: string, proposalId: number, weight: number, isFor: boolean) {
+  async function vote(roundAddress: string, proposalId: number, isFor: boolean) {
     setError(null);
     try {
       return await writeContractAsync({
         address: roundAddress as Address,
         abi: LIL_ROUND_ABI,
         functionName: 'vote',
-        args: [BigInt(proposalId), BigInt(weight), isFor],
+        args: [BigInt(proposalId), isFor],
       });
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
@@ -285,6 +312,35 @@ export function useVoteOnChain() {
   }
 
   return { vote, isPending, error };
+}
+
+/** Cast an allowlist vote on-chain via LilRound.voteWithProof */
+export function useVoteWithProofOnChain() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  async function voteWithProof(
+    roundAddress: string,
+    proposalId: number,
+    isFor: boolean,
+    weight: number,
+    proof: `0x${string}`[],
+  ) {
+    setError(null);
+    try {
+      return await writeContractAsync({
+        address: roundAddress as Address,
+        abi: LIL_ROUND_ABI,
+        functionName: 'voteWithProof',
+        args: [BigInt(proposalId), isFor, BigInt(weight), proof],
+      });
+    } catch (e: any) {
+      setError(e.message ?? 'Transaction failed');
+      throw e;
+    }
+  }
+
+  return { voteWithProof, isPending, error };
 }
 
 /** Deposit ETH into a round via LilRound.deposit */
@@ -312,23 +368,22 @@ export function useDepositToRound() {
   return { depositEth, isPending, error };
 }
 
-/** Set winners on a LilRound (owner only) */
-export function useSetWinners() {
+/** Finalize a round by selecting winners (anyone can call after voting ends) */
+export function useFinalizeRound() {
   const { writeContractAsync, isPending } = useWriteContract();
   const [error, setError] = useState<string | null>(null);
 
-  async function setWinners(
+  async function finalizeRound(
     roundAddress: string,
     proposalIds: number[],
-    amounts: number[],
   ) {
     setError(null);
     try {
       return await writeContractAsync({
         address: roundAddress as Address,
         abi: LIL_ROUND_ABI,
-        functionName: 'setWinners',
-        args: [proposalIds.map((id) => BigInt(id)), amounts.map((a) => BigInt(a))],
+        functionName: 'finalizeRound',
+        args: [proposalIds.map((id) => BigInt(id))],
       });
     } catch (e: any) {
       setError(e.message ?? 'Transaction failed');
@@ -336,7 +391,7 @@ export function useSetWinners() {
     }
   }
 
-  return { setWinners, isPending, error };
+  return { finalizeRound, isPending, error };
 }
 
 /** Claim an award from a LilRound (winners only) */

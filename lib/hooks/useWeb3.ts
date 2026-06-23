@@ -19,9 +19,8 @@ const ERC721_ABI = parseAbi([
 ]);
 
 /**
- * Fetch voting power for a user in a round.
- * Reads token balance (or delegated votes) for the connected wallet
- * against the community token contract.
+ * Display-only voting power preview. Actual vote weight is computed on-chain
+ * in LilRound.vote() based on the round's configured strategy.
  */
 export function useVotingPower(communityTokenAddress?: string) {
   const { address } = useAccount();

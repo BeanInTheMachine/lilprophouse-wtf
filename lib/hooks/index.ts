@@ -34,8 +34,9 @@ export {
   useCreateRoundOnChain,
   useProposeOnChain,
   useVoteOnChain,
+  useVoteWithProofOnChain,
   useDepositToRound,
-  useSetWinners,
+  useFinalizeRound,
   useClaimAward,
   useCancelRound,
   useApproveToken,
@@ -45,4 +46,5 @@ export {
   useDepositERC721,
   useDepositERC1155,
   useSetWinnerNfts,
+  type AwardConfig,
 } from './useOnChain';

@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
-import { useCancelRound, useRoundChainState, useDepositToRound, useSetWinners, useApproveToken, useDepositTokenToRound, useApproveERC721, useApproveERC1155, useDepositERC721, useDepositERC1155 } from '@/lib/hooks/useOnChain';
+import { useCancelRound, useRoundChainState, useDepositToRound, useFinalizeRound, useApproveToken, useDepositTokenToRound, useApproveERC721, useApproveERC1155, useDepositERC721, useDepositERC1155 } from '@/lib/hooks/useOnChain';
 import { useBalance, useReadContract } from 'wagmi';
 import { type Address, parseAbi } from 'viem';
 import Button from '@/components/ui/Button';
@@ -288,7 +288,7 @@ export default function RoundManagerPage() {
   const { state: chainState, owner: chainOwner } = useRoundChainState(chainAddress);
 
   const { cancelRound, isPending: cancelling } = useCancelRound();
-  const { setWinners, isPending: settingWinners } = useSetWinners();
+  const { finalizeRound, isPending: finalizing } = useFinalizeRound();
   const { depositEth, isPending: depositing } = useDepositToRound();
   const [depositAmount, setDepositAmount] = useState('');
   const [lastDepositAmount, setLastDepositAmount] = useState('');
@@ -345,15 +345,27 @@ export default function RoundManagerPage() {
   }
 
   async function handleFinalize() {
-    if (!confirm('Finalize this round? Winners will be selected.')) return;
     if (!round?.contractAddress) {
       setActionError('Round not deployed on-chain');
       return;
     }
+    const proposals = round.proposals ?? [];
+    if (proposals.length === 0) {
+      setActionError('No proposals to finalize');
+      return;
+    }
+    const sorted = [...proposals].sort((a: any, b: any) => b.voteCountFor - a.voteCountFor);
+    const winnerIds = sorted.slice(0, round.numWinners).map((p: any) => p.id);
+
+    if (!confirm(`Finalize this round?\n\nWinners will be: ${winnerIds.map((id: number) => {
+      const p = proposals.find((pp: any) => pp.id === id);
+      return p ? `#${id} "${p.title}" (${p.voteCountFor} votes)` : `#${id}`;
+    }).join('\n')}`)) return;
+
     setActionLabel('finalize');
     setActionError('');
     try {
-      const hash = await setWinners(round.contractAddress, [], []);
+      const hash = await finalizeRound(round.contractAddress, winnerIds);
       setTxHash(hash);
     } catch (e: any) {
       setActionError(e.message ?? 'Failed to finalize round');
@@ -361,7 +373,7 @@ export default function RoundManagerPage() {
     }
   }
 
-  const isBusy = cancelling || settingWinners || waiting;
+  const isBusy = cancelling || finalizing || waiting;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
@@ -519,13 +531,38 @@ export default function RoundManagerPage() {
         {/* Actions */}
         <Card className="p-6">
           <h3 className="font-bold text-lg text-brand-black mb-4">Actions</h3>
+
+          {/* Proposal ranking for finalization */}
+          {round.state === 'VOTING' && round.proposals && round.proposals.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-bold text-brand-black mb-2">Proposal Rankings</h4>
+              <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+                {[...round.proposals]
+                  .sort((a: any, b: any) => b.voteCountFor - a.voteCountFor)
+                  .map((p: any, idx: number) => (
+                    <div key={p.id} className={`flex items-center justify-between p-2 rounded-lg text-sm ${
+                      idx < round.numWinners ? 'bg-brand-purple-hint' : 'bg-surface-dark'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-bold ${idx < round.numWinners ? 'text-brand-purple' : 'text-brand-gray'}`}>
+                          #{idx + 1}
+                        </span>
+                        <span className="text-brand-black truncate max-w-[300px]">{p.title}</span>
+                      </div>
+                      <span className="font-bold text-brand-black">{p.voteCountFor} votes</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col gap-3">
-            {(round.state === 'ACCEPTING_PROPOSALS' || round.state === 'VOTING') && (
+            {(round.state === 'ACCEPTING_PROPOSALS' || round.state === 'VOTING') && isOwner && (
               <Button variant="outline" onClick={handleCancel} disabled={isBusy} className="border-brand-red text-brand-red hover:bg-brand-red-hint">
                 {actionLabel === 'cancel' && waiting ? 'Confirming...' : actionLabel === 'cancel' ? 'Signing...' : 'Cancel Round'}
               </Button>
             )}
-            {(round.state === 'VOTING' || round.state === 'COMPLETED') && (
+            {round.state === 'VOTING' && (
               <Button onClick={handleFinalize} disabled={isBusy}>
                 {actionLabel === 'finalize' && waiting ? 'Confirming...' : actionLabel === 'finalize' ? 'Signing...' : 'Finalize Round'}
               </Button>
@@ -533,8 +570,8 @@ export default function RoundManagerPage() {
             {(round.state === 'COMPLETED' || round.state === 'CANCELLED') && (
               <p className="text-sm text-brand-gray text-center py-2">No actions available for completed or cancelled rounds.</p>
             )}
-            {!isOwner && (
-              <p className="text-xs text-brand-gray text-center">Only the round owner can perform actions.</p>
+            {round.state === 'VOTING' && (
+              <p className="text-xs text-brand-gray text-center">Anyone can finalize the round once voting ends.</p>
             )}
           </div>
         </Card>

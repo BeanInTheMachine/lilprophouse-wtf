@@ -2,9 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { useAccount, useEnsName } from 'wagmi';
+import { useAccount, useEnsName, useSignTypedData, useWaitForTransactionReceipt } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
-import { useRoundChainState, useVoteOnChain, useDepositorsOnChain } from '@/lib/hooks/useOnChain';
+import { useRoundChainState, useVoteOnChain, useVoteWithProofOnChain, useHasVotedOn, useDepositorsOnChain } from '@/lib/hooks/useOnChain';
+import { useSubmitVotes } from '@/lib/hooks/useMutations';
+import { buildMerkleTree, generateMerkleProof } from '@/lib/merkle';
+import { DOMAIN_SEPARATOR, VOTE_MESSAGE_TYPES } from '@/lib/eip712';
+import { deriveRoundState } from '@/lib/roundState';
 import RewardsDisplay from '@/components/round/RewardsDisplay';
 import Link from 'next/link';
 import dayjs from 'dayjs';
@@ -60,14 +64,58 @@ export default function RoundPage() {
   const chainAddress = (round?.contractAddress as `0x${string}` | undefined) ?? '0x0000000000000000000000000000000000000000';
   const { state: chainState, owner: chainOwner, totalDeposited } = useRoundChainState(chainAddress);
   const { vote, isPending: voting } = useVoteOnChain();
+  const { voteWithProof } = useVoteWithProofOnChain();
+  const { submitVotes } = useSubmitVotes();
+  const { signTypedDataAsync } = useSignTypedData();
   const { depositors } = useDepositorsOnChain(round?.contractAddress ?? undefined);
   const [votingPropId, setVotingPropId] = useState<number | null>(null);
+  const [votingDirection, setVotingDirection] = useState<'for' | 'against' | 'abstain' | null>(null);
+  const [voteTxHash, setVoteTxHash] = useState<`0x${string}` | null>(null);
+  const { data: voteReceipt } = useWaitForTransactionReceipt({ hash: voteTxHash ?? undefined });
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!voteReceipt || !round || !wallet || votingPropId === null || !votingDirection) return;
+    const blockHeight = Number(voteReceipt.blockNumber);
+    const msg = {
+      direction: votingDirection === 'for' ? 0 : votingDirection === 'against' ? 1 : 2,
+      proposalId: votingPropId,
+      weight: 1,
+      communityAddress: round.contractAddress ?? '0x0000000000000000000000000000000000000000',
+      blockHeight,
+    };
+    (async () => {
+      try {
+        const signedMessageString = JSON.stringify(msg);
+        const signature = await signTypedDataAsync({
+          domain: DOMAIN_SEPARATOR,
+          types: VOTE_MESSAGE_TYPES,
+          primaryType: 'Vote',
+          message: msg,
+        });
+        await submitVotes([{
+          direction: votingDirection.toUpperCase() as 'FOR' | 'AGAINST' | 'ABSTAIN',
+          weight: 1,
+          address: wallet,
+          proposalId: votingPropId,
+          roundId: round.id,
+          communityAddress: msg.communityAddress,
+          signature,
+          signedMessage: Buffer.from(signedMessageString).toString('base64'),
+        }]);
+      } catch {
+        // DB sync is best-effort; on-chain vote already succeeded
+      }
+      setVotingPropId(null);
+      setVotingDirection(null);
+      setVoteTxHash(null);
+    })();
+  }, [voteReceipt]);
 
   function formatCountdown(deadline: Date): string | null {
     const diff = dayjs(deadline).diff(dayjs(now));
@@ -82,6 +130,59 @@ export default function RoundPage() {
     if (m > 0) parts.push(`${m}m`);
     parts.push(`${s}s`);
     return parts.join(' ');
+  }
+
+  function getStrategyDescription(): string {
+    if (!round?.voteStrategy) return '';
+    const vs = round.voteStrategy as any;
+    const voters = vs.voters ?? [];
+    if (voters.length === 0) return 'Open voting (1 vote per address)';
+    const allMembers: { address: string; govPower: string }[] = [];
+    for (const v of voters) {
+      if (v.strategyType === 'ALLOWLIST' && v.members) {
+        allMembers.push(...v.members);
+      } else if (v.address) {
+        allMembers.push({ address: v.address, govPower: String(v.multiplier ?? 1) });
+      }
+    }
+    if (allMembers.length > 1) return `Allowlist — ${allMembers.length} voters`;
+    if (allMembers.length === 1) return `Allowlist — 1 voter`;
+    if (voters[0]?.strategyType?.includes('ERC')) {
+      return `Token holders of ${voters[0].address?.slice(0, 6)}...${voters[0].address?.slice(-4)} ×${voters[0].multiplier ?? 1}`;
+    }
+    return 'Open voting (1 vote per address)';
+  }
+
+  async function handleVoteOnProposal(proposal: any, direction: 'for' | 'against' | 'abstain') {
+    if (!round?.contractAddress || !wallet) return;
+    setVotingPropId(proposal.id);
+    setVotingDirection(direction);
+    try {
+      const isFor = direction === 'for';
+
+      const vs = round.voteStrategy as any;
+      const voters = vs?.voters ?? [];
+      const isAllowlist = voters.some((v: any) => v.strategyType === 'ALLOWLIST');
+
+      if (isAllowlist) {
+        const allowlistVoter = voters.find((v: any) => v.strategyType === 'ALLOWLIST');
+        const members = allowlistVoter?.members ?? [];
+        const tree = buildMerkleTree(members.map((m: any) => ({ address: m.address, weight: m.govPower })));
+        const proof = generateMerkleProof(tree, wallet);
+        const memberEntry = members.find((m: any) => m.address.toLowerCase() === wallet.toLowerCase());
+        if (!proof || !memberEntry) {
+          throw new Error('Not on allowlist');
+        }
+        const hash = await voteWithProof(round.contractAddress, proposal.id, isFor, Number(memberEntry.govPower), proof);
+        setVoteTxHash(hash);
+      } else {
+        const hash = await vote(round.contractAddress, proposal.id, isFor);
+        setVoteTxHash(hash);
+      }
+    } catch {
+      setVotingPropId(null);
+      setVotingDirection(null);
+    }
   }
 
   if (loading) {
@@ -112,10 +213,11 @@ export default function RoundPage() {
     );
   }
 
-  const banner = STATE_BANNERS[round.state] ?? STATE_BANNERS.NOT_STARTED;
+  const effectiveState = round ? deriveRoundState(round) : 'NOT_STARTED';
+  const banner = STATE_BANNERS[effectiveState] ?? STATE_BANNERS.NOT_STARTED;
   const colors = BANNER_COLORS[banner.variant];
   const proposals = round.proposals ?? [];
-  const isAccepting = round.state === 'ACCEPTING_PROPOSALS';
+  const isAccepting = effectiveState === 'ACCEPTING_PROPOSALS';
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -131,11 +233,11 @@ export default function RoundPage() {
         <div className="flex items-center gap-3">
           <span className={`w-2.5 h-2.5 rounded-full ${colors.text.replace('text-', 'bg-')}`} />
           <h2 className={`font-bold text-base ${colors.text}`}>{banner.title}</h2>
-          {(round.state === 'ACCEPTING_PROPOSALS' || round.state === 'VOTING') && (
+          {(effectiveState === 'ACCEPTING_PROPOSALS' || effectiveState === 'VOTING') && (
             'proposalEndTime' in round && 'votingEndTime' in round && (
               <span className="ml-auto font-mono text-sm font-bold text-brand-black">
                 {formatCountdown(
-                  round.state === 'ACCEPTING_PROPOSALS'
+                  effectiveState === 'ACCEPTING_PROPOSALS'
                     ? round.proposalEndTime!
                     : round.votingEndTime!
                 ) ?? 'Ended'}
@@ -145,6 +247,12 @@ export default function RoundPage() {
         </div>
         <p className="text-sm text-brand-gray mt-1 ml-5.5">{banner.message}</p>
       </div>
+
+      {getStrategyDescription() && (
+        <div className="bg-surface-dark border border-border-light rounded-xl px-4 py-3 mb-8 text-sm text-brand-gray">
+          <span className="font-bold text-brand-black">Who can vote:</span> {getStrategyDescription()}
+        </div>
+      )}
 
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-3">
@@ -262,34 +370,81 @@ export default function RoundPage() {
             {proposals.map((proposal: any) => {
               const totalVotes = proposal.voteCountFor + proposal.voteCountAgainst;
               const forPercent = totalVotes > 0 ? (proposal.voteCountFor / totalVotes) * 100 : 0;
+              const isVoting = effectiveState === 'VOTING';
+              const { hasVoted } = useHasVotedOn(
+                round?.contractAddress ?? undefined,
+                proposal.id,
+                wallet ?? undefined,
+              );
 
               return (
-                <Link
+                <div
                   key={proposal.id}
-                  href={`/proposals/${proposal.id}`}
-                  className="block bg-surface-light border border-border-light rounded-2xl p-5 shadow-low hover:shadow-high transition-all duration-150 ease-out"
+                  className="bg-surface-light border border-border-light rounded-2xl p-5 shadow-low hover:shadow-high transition-all duration-150 ease-out"
                 >
-                  <h3 className="font-bold text-base text-brand-black mb-1">{proposal.title}</h3>
-                  <p className="text-sm text-brand-gray line-clamp-2 mb-3">{proposal.tldr}</p>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-brand-gray">
-                      by <span className="font-medium text-brand-black font-mono text-xs">{proposal.address.slice(0, 6)}...{proposal.address.slice(-4)}</span>
-                    </span>
-                    {totalVotes > 0 && (
-                      <>
-                        <span className="text-brand-gray">&middot;</span>
-                        <div className="flex items-center gap-2">
-                          <div className="w-20 h-2 bg-border-light rounded-full overflow-hidden">
-                            <div className="h-full bg-brand-purple rounded-full" style={{ width: `${forPercent}%` }} />
+                  <Link href={`/proposals/${proposal.id}`} className="block no-underline">
+                    <h3 className="font-bold text-base text-brand-black mb-1">{proposal.title}</h3>
+                    <p className="text-sm text-brand-gray line-clamp-2 mb-3">{proposal.tldr}</p>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-brand-gray">
+                        by <span className="font-medium text-brand-black font-mono text-xs">{proposal.address.slice(0, 6)}...{proposal.address.slice(-4)}</span>
+                      </span>
+                      {totalVotes > 0 && (
+                        <>
+                          <span className="text-brand-gray">&middot;</span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-20 h-2 bg-border-light rounded-full overflow-hidden">
+                              <div className="h-full bg-brand-purple rounded-full" style={{ width: `${forPercent}%` }} />
+                            </div>
+                            <span className="text-xs text-brand-gray">
+                              {proposal.voteCountFor} / {totalVotes}
+                            </span>
                           </div>
-                          <span className="text-xs text-brand-gray">
-                            {proposal.voteCountFor} / {totalVotes}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </Link>
+                        </>
+                      )}
+                    </div>
+                  </Link>
+                  {isVoting && round.contractAddress && wallet && (
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-border-light">
+                      {hasVoted ? (
+                        <span className="text-sm font-bold text-brand-purple py-1.5">Voted</span>
+                      ) : (
+                        <>
+                          <button
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              await handleVoteOnProposal(proposal, 'for');
+                            }}
+                            disabled={votingPropId !== null}
+                            className="flex-1 px-3 py-1.5 rounded-[10px] text-sm font-bold text-white bg-brand-green hover:opacity-90 transition-colors disabled:opacity-50"
+                          >
+                            {votingPropId === proposal.id && votingDirection === 'for' ? 'Voting...' : 'Vote For'}
+                          </button>
+                          <button
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              await handleVoteOnProposal(proposal, 'against');
+                            }}
+                            disabled={votingPropId !== null}
+                            className="flex-1 px-3 py-1.5 rounded-[10px] text-sm font-bold text-white bg-brand-red hover:opacity-90 transition-colors disabled:opacity-50"
+                          >
+                            {votingPropId === proposal.id && votingDirection === 'against' ? 'Voting...' : 'Vote Against'}
+                          </button>
+                          <button
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              await handleVoteOnProposal(proposal, 'abstain');
+                            }}
+                            disabled={votingPropId !== null}
+                            className="px-3 py-1.5 rounded-[10px] text-sm font-bold text-brand-gray bg-surface-dark hover:bg-border-light transition-colors disabled:opacity-50"
+                          >
+                            {votingPropId === proposal.id && votingDirection === 'abstain' ? '...' : 'Abstain'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
