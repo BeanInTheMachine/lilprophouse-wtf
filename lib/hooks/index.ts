@@ -29,6 +29,7 @@ export {
   useProposalOnChain,
   useHasVotedOn,
   useRoundChainState,
+  useWinnerInfo,
   // Write hooks
   useCreateHouseOnChain,
   useCreateRoundOnChain,

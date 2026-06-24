@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
-import { useCancelRound, useRoundChainState, useDepositToRound, useFinalizeRound, useApproveToken, useDepositTokenToRound, useApproveERC721, useApproveERC1155, useDepositERC721, useDepositERC1155 } from '@/lib/hooks/useOnChain';
+import { useCancelRound, useRoundChainState, useDepositToRound, useFinalizeRound, useClaimAward, useWinnerInfo, useApproveToken, useDepositTokenToRound, useApproveERC721, useApproveERC1155, useDepositERC721, useDepositERC1155 } from '@/lib/hooks/useOnChain';
 import { useBalance, useReadContract } from 'wagmi';
 import { type Address, parseAbi } from 'viem';
 import Button from '@/components/ui/Button';
@@ -278,6 +278,48 @@ function Erc20DepositSection({ roundAddress, presetToken }: { roundAddress: stri
   );
 }
 
+function WinnerClaimRow({ roundAddress, onChainIndex, title }: { roundAddress: string; onChainIndex: number; title: string }) {
+  const { isWinner, isClaimed, loading: infoLoading } = useWinnerInfo(roundAddress, onChainIndex);
+  const { claimAward, isPending: claiming, error: claimError } = useClaimAward();
+  const [claimHash, setClaimHash] = useState<`0x${string}` | null>(null);
+  const { isLoading: confirming } = useWaitForTransactionReceipt({ hash: claimHash ?? undefined });
+  const [claimed, setClaimed] = useState(false);
+
+  if (infoLoading) return null;
+
+  if (claimed || isClaimed) {
+    return (
+      <p className="text-sm text-brand-green text-center py-2">
+        Award claimed for <span className="font-bold">&ldquo;{title}&rdquo;</span>.
+      </p>
+    );
+  }
+
+  if (!isWinner) return null;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between p-2 bg-brand-purple-hint rounded-lg">
+        <span className="text-sm text-brand-black font-medium truncate max-w-[350px]">{title}</span>
+        <Button
+          onClick={async () => {
+            try {
+              const hash = await claimAward(roundAddress, onChainIndex);
+              setClaimHash(hash);
+            } catch { /* error shown below */ }
+          }}
+          disabled={claiming || confirming}
+        >
+          {confirming ? 'Confirming...' : claiming ? 'Signing...' : 'Claim Award'}
+        </Button>
+      </div>
+      {claimError && (
+        <p className="text-xs text-brand-red mt-1">{claimError}</p>
+      )}
+    </div>
+  );
+}
+
 export default function RoundManagerPage() {
   const params = useParams<{ roundId: string }>();
   const roundId = parseInt(params.roundId, 10);
@@ -325,6 +367,10 @@ export default function RoundManagerPage() {
   }
 
   const isOwner = chainOwner ? chainOwner.toLowerCase() === address?.toLowerCase() : false;
+
+  const userProposals = (round.proposals ?? []).filter((p: any) =>
+    p.address && address && p.address.toLowerCase() === address.toLowerCase() && p.onChainIndex !== null && p.onChainIndex !== undefined
+  );
 
   async function handleCancel() {
     if (!confirm('Are you sure you want to cancel this round? This cannot be undone.')) return;
@@ -567,8 +613,27 @@ export default function RoundManagerPage() {
                 {actionLabel === 'finalize' && waiting ? 'Confirming...' : actionLabel === 'finalize' ? 'Signing...' : 'Finalize Round'}
               </Button>
             )}
-            {(round.state === 'COMPLETED' || round.state === 'CANCELLED') && (
-              <p className="text-sm text-brand-gray text-center py-2">No actions available for completed or cancelled rounds.</p>
+            {round.state === 'COMPLETED' && round.contractAddress && (
+              <div className="mb-4">
+                <h4 className="text-sm font-bold text-brand-black mb-2">Claim Awards</h4>
+                {userProposals.length === 0 ? (
+                  <p className="text-sm text-brand-gray text-center py-2">No proposals by you in this round.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {userProposals.map((p: any) => (
+                      <WinnerClaimRow
+                        key={p.id}
+                        roundAddress={round.contractAddress!}
+                        onChainIndex={p.onChainIndex}
+                        title={p.title}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {round.state === 'CANCELLED' && (
+              <p className="text-sm text-brand-gray text-center py-2">No actions available for cancelled rounds.</p>
             )}
             {round.state === 'VOTING' && (
               <p className="text-xs text-brand-gray text-center">Anyone can finalize the round once voting ends.</p>

@@ -108,6 +108,32 @@ export function useHasVotedOn(roundAddress?: string, proposalId?: number, voter?
   };
 }
 
+/** Check if an on-chain proposal has won and whether it's been claimed */
+export function useWinnerInfo(roundAddress?: string, onChainIndex?: number) {
+  const { data: position, isLoading: posLoading } = useReadContract({
+    address: roundAddress as Address | undefined,
+    abi: LIL_ROUND_ABI,
+    functionName: 'winnerPositions',
+    args: onChainIndex !== undefined ? [BigInt(onChainIndex)] : undefined,
+    query: { enabled: !!roundAddress && onChainIndex !== undefined },
+  });
+
+  const { data: isClaimed, isLoading: claimedLoading } = useReadContract({
+    address: roundAddress as Address | undefined,
+    abi: LIL_ROUND_ABI,
+    functionName: 'claimed',
+    args: onChainIndex !== undefined ? [BigInt(onChainIndex)] : undefined,
+    query: { enabled: !!roundAddress && onChainIndex !== undefined },
+  });
+
+  const posVal = position as bigint | undefined;
+  return {
+    isWinner: posVal !== undefined && posVal > 0n,
+    isClaimed: (isClaimed as boolean) ?? false,
+    loading: posLoading || claimedLoading,
+  };
+}
+
 /** Read round state from LilRound contract */
 export function useRoundChainState(roundAddress?: string) {
   const { data: state } = useReadContract({

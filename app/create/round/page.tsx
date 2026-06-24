@@ -139,6 +139,9 @@ export default function CreateRoundPage() {
   const { createRound, isPending: isDeploying } = useCreateRoundOnChain();
   const { data: receipt } = useWaitForTransactionReceipt({ hash: txHash ?? undefined });
 
+  const devMinutes = process.env.NEXT_PUBLIC_DEV_DURATION_MINUTES;
+  const devDuration = devMinutes ? parseInt(devMinutes) * 60 : null;
+
   function handleSelectHouse(house: HouseInfo) {
     updateRound({ house });
   }
@@ -164,8 +167,8 @@ export default function CreateRoundPage() {
           round.title,
           round.description || '',
           round.numWinners,
-          round.proposalPeriodDurationSecs,
-          round.votePeriodDurationSecs,
+          devDuration ?? round.proposalPeriodDurationSecs,
+          devDuration ?? round.votePeriodDurationSecs,
           voteStrategyType,
           votingToken,
           votingTokenId,
@@ -226,11 +229,11 @@ export default function CreateRoundPage() {
       currencyType: round.awards[0]?.type === 'ETH' ? 'ETH' : (round.awards[0]?.symbol ?? 'ETH'),
       numWinners: round.numWinners,
       startTime: new Date(round.proposalPeriodStartUnixTimestamp * 1000).toISOString(),
-      proposalEndTime: round.proposalPeriodDurationSecs > 0
-        ? new Date((round.proposalPeriodStartUnixTimestamp + round.proposalPeriodDurationSecs) * 1000).toISOString()
+      proposalEndTime: (devDuration ?? round.proposalPeriodDurationSecs) > 0
+        ? new Date((round.proposalPeriodStartUnixTimestamp + (devDuration ?? round.proposalPeriodDurationSecs)) * 1000).toISOString()
         : null,
-      votingEndTime: round.votePeriodDurationSecs > 0
-        ? new Date((round.proposalPeriodStartUnixTimestamp + round.proposalPeriodDurationSecs + round.votePeriodDurationSecs) * 1000).toISOString()
+      votingEndTime: (devDuration ?? round.votePeriodDurationSecs) > 0
+        ? new Date((round.proposalPeriodStartUnixTimestamp + (devDuration ?? round.proposalPeriodDurationSecs) + (devDuration ?? round.votePeriodDurationSecs)) * 1000).toISOString()
         : null,
       houseId: round.house.id,
       propStrategy: { type: 'custom', voters: round.voters },
