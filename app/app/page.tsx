@@ -6,6 +6,7 @@ import RoundList from '@/components/RoundList';
 import { get } from '@/lib/api-client';
 import { useEffect } from 'react';
 import LoadingIndicator from '@/components/ui/LoadingIndicator';
+import { deriveRoundState } from '@/lib/roundState';
 
 export default function BrowsePage() {
   const [tab, setTab] = useState<'active' | 'completed'>('active');
@@ -77,7 +78,7 @@ export default function BrowsePage() {
             id: r.id,
             title: r.title,
             type: r.type,
-            state: r.state,
+            state: deriveRoundState(r),
             fundingAmount: Number(r.fundingAmount),
             currencyType: r.currencyType,
             numWinners: r.numWinners,

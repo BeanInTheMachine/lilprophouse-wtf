@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { useRound } from '@/lib/hooks/useApi';
-import { useCancelRound, useRoundChainState, useDepositToRound, useFinalizeRound, useClaimAward, useWinnerInfo, useApproveToken, useDepositTokenToRound, useApproveERC721, useApproveERC1155, useDepositERC721, useDepositERC1155 } from '@/lib/hooks/useOnChain';
+import { useCancelRound, useRoundChainState, useDepositToRound, useFinalizeRound, useClaimAward, useWinnerInfo, useApproveToken, useDepositTokenToRound, useApproveERC721, useApproveERC1155, useDepositERC721, useDepositERC1155, useRefund } from '@/lib/hooks/useOnChain';
 import { useBalance, useReadContract } from 'wagmi';
 import { type Address, parseAbi } from 'viem';
 import Button from '@/components/ui/Button';
@@ -317,6 +317,87 @@ function WinnerClaimRow({ roundAddress, onChainIndex, title }: { roundAddress: s
         <p className="text-xs text-brand-red mt-1">{claimError}</p>
       )}
     </div>
+  );
+}
+
+function ReclaimSection({ roundAddress, chainState }: { roundAddress: string; chainState?: number }) {
+  const { refundEth, refundToken, refundNft, refundExcessEth, refundExcessToken, isPending, error } = useRefund();
+  const [mode, setMode] = useState<'full' | 'excess'>(chainState === 3 ? 'excess' : 'full');
+  const [tokenAddr, setTokenAddr] = useState('');
+  const [nftIndex, setNftIndex] = useState('');
+  const [status, setStatus] = useState('');
+  const [txHash, setTxHash] = useState<`0x${string}` | null>(null);
+  const { data: receipt } = useWaitForTransactionReceipt({ hash: txHash ?? undefined });
+
+  useEffect(() => {
+    if (receipt && status === 'confirming') setStatus('confirmed');
+  }, [receipt, status]);
+
+  async function run(fn: () => Promise<`0x${string}`>) {
+    setStatus('signing');
+    try {
+      const h = await fn();
+      setTxHash(h);
+      setStatus('confirming');
+    } catch {
+      setStatus('');
+    }
+  }
+
+  const validToken = tokenAddr.match(/^0x[a-fA-F0-9]{40}$/) ? tokenAddr : undefined;
+  const idxNum = parseInt(nftIndex, 10);
+  const busy = isPending || status === 'signing' || status === 'confirming';
+
+  return (
+    <>
+      <p className="text-sm text-brand-gray mb-4">
+        Reclaim funds you deposited. <strong>Full refund</strong> applies when a round was
+        cancelled or ended with no winners. <strong>Excess only</strong> applies to over-funded
+        completed rounds, and only after the 14-day claim window has passed.
+      </p>
+
+      <div className="flex gap-2 mb-4">
+        {([['full', 'Full refund'], ['excess', 'Excess only']] as const).map(([m, label]) => (
+          <button key={m} onClick={() => setMode(m)}
+            className={`px-3 py-1 rounded-[10px] text-xs font-bold ${mode === m ? 'bg-brand-purple text-white' : 'bg-surface-dark text-brand-gray'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <Button
+          onClick={() => run(() => (mode === 'full' ? refundEth(roundAddress) : refundExcessEth(roundAddress)))}
+          disabled={busy}
+        >
+          {busy ? 'Working...' : 'Reclaim ETH'}
+        </Button>
+
+        <div className="flex gap-2 items-end">
+          <InputFormGroup label="ERC-20 token address" name="reclaimToken" value={tokenAddr}
+            onChange={(e) => setTokenAddr(e.target.value)} placeholder="0x..." className="flex-1" />
+          <Button variant="outline"
+            onClick={() => validToken && run(() => (mode === 'full' ? refundToken(roundAddress, validToken) : refundExcessToken(roundAddress, validToken)))}
+            disabled={busy || !validToken}>
+            Reclaim Token
+          </Button>
+        </div>
+
+        <div className="flex gap-2 items-end">
+          <InputFormGroup label="Deposited NFT index" name="reclaimNft" value={nftIndex}
+            onChange={(e) => setNftIndex(e.target.value)} placeholder="0" className="flex-1" />
+          <Button variant="outline"
+            onClick={() => !isNaN(idxNum) && run(() => refundNft(roundAddress, idxNum))}
+            disabled={busy || isNaN(idxNum)}>
+            Reclaim NFT
+          </Button>
+        </div>
+      </div>
+
+      {status === 'confirming' && <p className="text-sm text-brand-purple mt-3">Transaction pending. Waiting for confirmation...</p>}
+      {status === 'confirmed' && <p className="text-sm text-brand-green mt-3">Reclaim confirmed.</p>}
+      {error && <p className="text-sm text-brand-red mt-3">{error}</p>}
+    </>
   );
 }
 
@@ -640,6 +721,14 @@ export default function RoundManagerPage() {
             )}
           </div>
         </Card>
+
+        {/* Reclaim Funds */}
+        {round.contractAddress && (chainState === 3 || chainState === 4) && (
+          <Card className="p-6">
+            <h3 className="font-bold text-lg text-brand-black mb-4">Reclaim Funds</h3>
+            <ReclaimSection roundAddress={round.contractAddress} chainState={chainState} />
+          </Card>
+        )}
       </div>
     </div>
   );

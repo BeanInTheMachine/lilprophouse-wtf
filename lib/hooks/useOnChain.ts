@@ -489,6 +489,48 @@ export function useCancelRound() {
   return { cancelRound, isPending, error };
 }
 
+/** Reclaim deposited funds from a LilRound (refunds open when cancelled,
+ *  completed with no winners, or — for over-funding excess — after the claim window) */
+export function useRefund() {
+  const { writeContractAsync, isPending } = useWriteContract();
+  const [error, setError] = useState<string | null>(null);
+
+  function wrap<T extends any[]>(functionName: string, mapArgs: (...a: T) => { address: string; args?: any[] }) {
+    return async (...a: T) => {
+      setError(null);
+      const { address, args } = mapArgs(...a);
+      try {
+        return await writeContractAsync({
+          address: address as Address,
+          abi: LIL_ROUND_ABI,
+          functionName,
+          ...(args ? { args } : {}),
+        } as any);
+      } catch (e: any) {
+        setError(e.message ?? 'Transaction failed');
+        throw e;
+      }
+    };
+  }
+
+  const refundEth = wrap<[string]>('refundEth', (roundAddress) => ({ address: roundAddress }));
+  const refundToken = wrap<[string, string]>('refundToken', (roundAddress, token) => ({
+    address: roundAddress,
+    args: [token as Address],
+  }));
+  const refundNft = wrap<[string, number]>('refundNft', (roundAddress, index) => ({
+    address: roundAddress,
+    args: [BigInt(index)],
+  }));
+  const refundExcessEth = wrap<[string]>('refundExcessEth', (roundAddress) => ({ address: roundAddress }));
+  const refundExcessToken = wrap<[string, string]>('refundExcessToken', (roundAddress, token) => ({
+    address: roundAddress,
+    args: [token as Address],
+  }));
+
+  return { refundEth, refundToken, refundNft, refundExcessEth, refundExcessToken, isPending, error };
+}
+
 /** Approve ERC20 token spend for a round contract */
 export function useApproveToken() {
   const { writeContractAsync, isPending } = useWriteContract();

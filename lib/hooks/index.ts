@@ -40,6 +40,7 @@ export {
   useFinalizeRound,
   useClaimAward,
   useCancelRound,
+  useRefund,
   useApproveToken,
   useDepositTokenToRound,
   useApproveERC721,

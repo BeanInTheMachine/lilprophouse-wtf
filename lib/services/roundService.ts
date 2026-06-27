@@ -15,7 +15,7 @@ export async function getRoundById(id: number) {
 
 export async function getRoundsForHouse(houseId: number) {
   return prisma.round.findMany({
-    where: { houseId, visible: true },
+    where: { houseId, visible: true, state: { not: 'CANCELLED' } },
     include: {
       proposals: {
         where: { deletedAt: null },
@@ -27,10 +27,12 @@ export async function getRoundsForHouse(houseId: number) {
 }
 
 export async function getActiveRounds() {
+  const now = new Date();
   return prisma.round.findMany({
     where: {
       visible: true,
-      state: { in: ['ACCEPTING_PROPOSALS', 'VOTING'] },
+      state: { notIn: ['COMPLETED', 'CANCELLED', 'NOT_STARTED'] },
+      OR: [{ votingEndTime: null }, { votingEndTime: { gt: now } }],
     },
     include: {
       proposals: {
@@ -44,10 +46,12 @@ export async function getActiveRounds() {
 }
 
 export async function getCompletedRounds() {
+  const now = new Date();
   return prisma.round.findMany({
     where: {
       visible: true,
-      state: { in: ['COMPLETED', 'CANCELLED'] },
+      state: { notIn: ['CANCELLED', 'NOT_STARTED'] },
+      OR: [{ state: 'COMPLETED' }, { votingEndTime: { lte: now } }],
     },
     include: {
       proposals: {

@@ -102,6 +102,28 @@ contract LilRound {
     mapping(uint256 => bool) public nftClaimed;
     uint256 public nftDepositCount;
 
+    // ===== PER-DEPOSITOR ACCOUNTING (for refunds) =====
+
+    uint256 public constant CLAIM_WINDOW = 14 days;
+
+    mapping(address => uint256) public ethDepositOf;
+    mapping(address => mapping(address => uint256)) public tokenDepositOf;
+    address[] public depositedTokens;
+    mapping(address => bool) private _tokenSeen;
+
+    uint256[] public winnerProposalIds;
+    uint256 public winnersAssigned;
+
+    bool public excessRefundsOpen;
+    uint256 public excessEthPool;
+    uint256 public totalEthForExcess;
+    mapping(address => uint256) public excessTokenPool;
+    mapping(address => uint256) public totalTokenForExcess;
+    mapping(address => uint256) public excessEthRefundedOf;
+    mapping(address => mapping(address => uint256)) public excessTokenRefundedOf;
+
+    uint256 private _locked = 1;
+
     // ===== EVENTS =====
 
     event RoundStateChanged(State newState);
@@ -115,8 +137,17 @@ contract LilRound {
     event RoundCancelled();
     event NFTDeposited(address indexed depositor, address indexed nftContract, uint256 tokenId, uint256 amount, bool isERC1155);
     event NFTAwarded(uint256 indexed proposalId, address indexed winner, address nftContract, uint256 tokenId, uint256 amount);
+    event Refunded(address indexed to, address indexed asset, uint256 amountOrTokenId);
+    event ExcessRefunded(address indexed to, address indexed asset, uint256 amount);
 
     modifier onlyOwner() { require(msg.sender == owner, "Not owner"); _; }
+
+    modifier nonReentrant() {
+        require(_locked == 1, "Reentrant");
+        _locked = 2;
+        _;
+        _locked = 1;
+    }
 
     constructor(
         address _owner,
@@ -227,7 +258,9 @@ contract LilRound {
 
         for (uint256 i = 0; i < _proposalIds.length; i++) {
             winnerPositions[_proposalIds[i]] = i + 1;
+            winnerProposalIds.push(_proposalIds[i]);
         }
+        winnersAssigned = _proposalIds.length;
 
         completed = true;
         completedAt = block.timestamp;
@@ -302,7 +335,7 @@ contract LilRound {
         emit VoteAttested(_proposalId, msg.sender, _signature);
     }
 
-    function claim(uint256 _proposalId) external {
+    function claim(uint256 _proposalId) external nonReentrant {
         require(completed, "Round not finalized");
         require(_proposalId < proposals.length, "Invalid proposal");
         require(proposals[_proposalId].proposer == msg.sender, "Not your proposal");
@@ -327,6 +360,7 @@ contract LilRound {
         require(!cancelled && !completed, "Round finalized");
         require(msg.value > 0, "Must deposit ETH");
         totalDeposited += msg.value;
+        ethDepositOf[msg.sender] += msg.value;
         emit DepositReceived(msg.sender, msg.value);
     }
 
@@ -342,6 +376,11 @@ contract LilRound {
         require(received > 0, "No tokens received");
 
         tokenDeposits[_token] += received;
+        tokenDepositOf[_token][msg.sender] += received;
+        if (!_tokenSeen[_token]) {
+            _tokenSeen[_token] = true;
+            depositedTokens.push(_token);
+        }
         emit TokenDeposited(msg.sender, _token, received);
     }
 
@@ -400,8 +439,136 @@ contract LilRound {
         winnerNftIndices[_proposalId] = _nftIndices;
     }
 
+    // ==================== REFUNDS ====================
+
+    function _fullRefundOpen() internal view returns (bool) {
+        if (cancelled) return true;
+        if (completed && winnersAssigned == 0) return true;
+        if (proposals.length == 0 && block.timestamp >= votingEndTimestamp) return true;
+        return false;
+    }
+
+    function _excessWindowPassed() internal view returns (bool) {
+        return completed && winnersAssigned > 0 && completedAt > 0
+            && block.timestamp >= completedAt + CLAIM_WINDOW;
+    }
+
+    function _ethObligations() internal view returns (uint256 total) {
+        for (uint256 i = 0; i < winnerProposalIds.length; i++) {
+            uint256 pid = winnerProposalIds[i];
+            if (claimed[pid]) continue;
+            uint256 pos = winnerPositions[pid] - 1;
+            if (pos < awardConfigs.length) {
+                AwardConfig storage c = awardConfigs[pos];
+                if (c.assetType == AssetType.ETH) total += c.amountPerWinner;
+            }
+        }
+    }
+
+    function _tokenObligations(address _token) internal view returns (uint256 total) {
+        for (uint256 i = 0; i < winnerProposalIds.length; i++) {
+            uint256 pid = winnerProposalIds[i];
+            if (claimed[pid]) continue;
+            uint256 pos = winnerPositions[pid] - 1;
+            if (pos < awardConfigs.length) {
+                AwardConfig storage c = awardConfigs[pos];
+                if (c.assetType == AssetType.ERC20 && c.tokenAddress == _token) {
+                    total += c.amountPerWinner;
+                }
+            }
+        }
+    }
+
+    /// @notice Refund a funder's exact deposit when the round was cancelled
+    ///         or completed with no winners (e.g. no submissions).
+    function refundEth() external nonReentrant {
+        require(_fullRefundOpen(), "Refunds not open");
+        uint256 amt = ethDepositOf[msg.sender];
+        require(amt > 0, "Nothing to refund");
+        ethDepositOf[msg.sender] = 0;
+        totalDeposited = totalDeposited >= amt ? totalDeposited - amt : 0;
+        (bool ok, ) = payable(msg.sender).call{value: amt}("");
+        require(ok, "ETH refund failed");
+        emit Refunded(msg.sender, address(0), amt);
+    }
+
+    function refundToken(address _token) external nonReentrant {
+        require(_fullRefundOpen(), "Refunds not open");
+        uint256 amt = tokenDepositOf[_token][msg.sender];
+        require(amt > 0, "Nothing to refund");
+        tokenDepositOf[_token][msg.sender] = 0;
+        tokenDeposits[_token] = tokenDeposits[_token] >= amt ? tokenDeposits[_token] - amt : 0;
+        require(IERC20(_token).transfer(msg.sender, amt), "Token refund failed");
+        emit Refunded(msg.sender, _token, amt);
+    }
+
+    /// @notice Return a deposited NFT to its depositor if it was never awarded.
+    function refundNft(uint256 _index) external nonReentrant {
+        require(_fullRefundOpen() || _excessWindowPassed(), "Refunds not open");
+        require(_index < depositedNFTs.length, "Invalid index");
+        DepositedNFT storage nft = depositedNFTs[_index];
+        require(nft.depositor == msg.sender, "Not your NFT");
+        require(!nftClaimed[_index], "NFT assigned/claimed");
+        nftClaimed[_index] = true;
+        if (nft.isERC1155) {
+            IERC1155(nft.nftContract).safeTransferFrom(address(this), msg.sender, nft.tokenId, nft.amount, "");
+        } else {
+            IERC721(nft.nftContract).transferFrom(address(this), msg.sender, nft.tokenId);
+        }
+        emit Refunded(msg.sender, nft.nftContract, nft.tokenId);
+    }
+
+    /// @notice Snapshot over-funding excess once the claim window has passed.
+    ///         Winner award obligations are reserved; only true excess is refundable.
+    function openExcessRefunds() public {
+        require(_excessWindowPassed(), "Claim window open");
+        require(!excessRefundsOpen, "Already open");
+
+        excessRefundsOpen = true;
+
+        totalEthForExcess = totalDeposited;
+        uint256 ethObl = _ethObligations();
+        uint256 ethBal = address(this).balance;
+        excessEthPool = ethBal > ethObl ? ethBal - ethObl : 0;
+
+        for (uint256 i = 0; i < depositedTokens.length; i++) {
+            address t = depositedTokens[i];
+            totalTokenForExcess[t] = tokenDeposits[t];
+            uint256 obl = _tokenObligations(t);
+            uint256 bal = IERC20(t).balanceOf(address(this));
+            excessTokenPool[t] = bal > obl ? bal - obl : 0;
+        }
+    }
+
+    /// @notice Withdraw a funder's pro-rata share of the ETH over-funding excess.
+    function refundExcessEth() external nonReentrant {
+        if (!excessRefundsOpen) openExcessRefunds();
+        require(totalEthForExcess > 0, "No deposits");
+        uint256 entitled = (excessEthPool * ethDepositOf[msg.sender]) / totalEthForExcess;
+        uint256 already = excessEthRefundedOf[msg.sender];
+        require(entitled > already, "Nothing to refund");
+        uint256 amt = entitled - already;
+        excessEthRefundedOf[msg.sender] = entitled;
+        (bool ok, ) = payable(msg.sender).call{value: amt}("");
+        require(ok, "ETH refund failed");
+        emit ExcessRefunded(msg.sender, address(0), amt);
+    }
+
+    function refundExcessToken(address _token) external nonReentrant {
+        if (!excessRefundsOpen) openExcessRefunds();
+        require(totalTokenForExcess[_token] > 0, "No deposits");
+        uint256 entitled = (excessTokenPool[_token] * tokenDepositOf[_token][msg.sender]) / totalTokenForExcess[_token];
+        uint256 already = excessTokenRefundedOf[msg.sender][_token];
+        require(entitled > already, "Nothing to refund");
+        uint256 amt = entitled - already;
+        excessTokenRefundedOf[msg.sender][_token] = entitled;
+        require(IERC20(_token).transfer(msg.sender, amt), "Token refund failed");
+        emit ExcessRefunded(msg.sender, _token, amt);
+    }
+
     receive() external payable {
         totalDeposited += msg.value;
+        ethDepositOf[msg.sender] += msg.value;
         emit DepositReceived(msg.sender, msg.value);
     }
 

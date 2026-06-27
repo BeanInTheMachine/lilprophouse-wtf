@@ -1,4 +1,4 @@
-# Session Context — 2026-06-23
+# Session Context — 2026-06-25
 
 ## Project: Lil Rounds
 
@@ -28,6 +28,7 @@ Fork of Prop House by Lil Nouns DAO. Communities create "rounds" where builders 
 | Smart contract | `contracts/LilRound.sol` |
 | House registry | `contracts/HouseRegistry.sol` |
 | Foundry config | `foundry.toml` |
+| Contract tests | `test/LilRound.t.sol` |
 | Prisma schema | `prisma/schema.prisma` |
 | Round service | `lib/services/roundService.ts` |
 | Proposal service | `lib/services/proposalService.ts` |
@@ -70,7 +71,73 @@ State derived from block.timestamp vs deadlines in `lib/roundState.ts` and `LilR
 
 ---
 
-## This Session (2026-06-23): Permanent On-Chain Voting Records
+## This Session (2026-06-25): Round Listing Fix + Fund Refunds
+
+Two independent pieces of work. Both implemented, type-checked, and verified. **Not yet committed** (working tree changes only).
+
+### Part A — Listings/stats now reflect *time-derived* state; cancelled rounds hidden
+
+**Problem:** The "Completed" tab was always empty and ended rounds stayed under "Active", because the listing queries filtered on the **stored DB `state` enum** — which is never advanced. Nothing ever writes `state = COMPLETED`; only the admin cancel API writes `CANCELLED` (and `visible:false`). Meanwhile the *real* state is time-derived (`lib/roundState.ts` `deriveRoundState()` / `LilRound.currentState()`).
+
+**Files changed:**
+- `lib/services/roundService.ts`:
+  - `getActiveRounds()` → time-aware: `state notIn [COMPLETED,CANCELLED,NOT_STARTED]` AND (`votingEndTime` null OR `> now`).
+  - `getCompletedRounds()` → `state notIn [CANCELLED,NOT_STARTED]` AND (`state=COMPLETED` OR `votingEndTime <= now`). **CANCELLED excluded** (not grouped into completed).
+  - `getRoundsForHouse()` → added defensive `state: { not: 'CANCELLED' }`.
+  - `getAllRounds()` (admin) **unchanged** — admins still see cancelled.
+- `app/app/page.tsx` → RoundList map uses `deriveRoundState(r)` (correct pill + countdown).
+- `app/houses/[address]/page.tsx` → active-count filter + RoundList map use `deriveRoundState(r)`.
+- `app/api/stats/route.ts` → `usdAwarded` time-aware + excludes CANCELLED; `proposals`/`votes` counts exclude items belonging to cancelled rounds (`round.state != CANCELLED`, and `proposal.round.state != CANCELLED` since `Vote` has no direct `round` relation).
+
+**Key fact:** cancelled rounds are already `visible:false` (set by admin cancel), so every `visible:true` query hides them from all public surfaces; only the admin dashboard shows them.
+
+**Verified:** `/api/rounds?state=active` → 0, `/api/rounds/completed` → 6, `/api/stats` `usdAwarded` 0 → 0.00016.
+
+### Part B — Trustless per-depositor refunds + over-funding sweep (`LilRound.sol`)
+
+**Problem:** Deposited ETH/ERC20/NFTs had **no way out** if a round ended with no submissions/no winners, or was over-funded. `cancel()` only flips a flag; `claim()` requires a winner → funds were permanently locked.
+
+**Design decisions (locked with user):** trustless **per-depositor**; unlock on **both** (cancel/empty **and** leftover excess); claim window = **14-day constant**; for normal completed rounds **only true excess** is refundable — winner award obligations are reserved forever and winners keep claim rights indefinitely.
+
+**Contract changes (`contracts/LilRound.sol`):**
+- New storage: `ethDepositOf`, `tokenDepositOf`, `depositedTokens`, `winnerProposalIds`, `winnersAssigned`, `CLAIM_WINDOW = 14 days`, excess-snapshot maps, reentrancy `_locked`.
+- `deposit()`/`receive()` credit `ethDepositOf`; `depositToken()` credits `tokenDepositOf` + registers token. ⚠️ Extra SSTORE in `receive()` → plain 2300-gas `.transfer`/`.send` sends now revert; fund via `deposit()`.
+- `finalizeRound()` records `winnerProposalIds` + `winnersAssigned`.
+- `nonReentrant` modifier added; `claim()` is now `nonReentrant`.
+- **Regime A (full exact refund)** when `cancelled || (completed && winnersAssigned==0) || (no proposals && voting ended)`: `refundEth()`, `refundToken(token)`, `refundNft(index)`.
+- **Regime B (excess only, after `completedAt + CLAIM_WINDOW`)**: `openExcessRefunds()` snapshots `excess = balance − unclaimed winner obligations` per asset (invariant to claim timing), then `refundExcessEth()` / `refundExcessToken(token)` pay each funder **pro-rata** by deposit share. Unassigned NFTs return to depositor via `refundNft()`.
+- New events: `Refunded`, `ExcessRefunded`.
+
+**Tests:** `test/LilRound.t.sol` — self-contained (inline `Vm` cheatcodes + minimal mocks, **no forge-std** so the TS `lib/` dir isn't polluted). **8/8 pass**: cancel ETH refund, empty-ended refund, multi-funder + double-refund revert, refund-not-open revert, ERC20 refund, NFT return, excess-after-window pro-rata (winner still gets award), reentrancy blocked.
+
+**Frontend:**
+- `lib/hooks/useOnChain.ts` → `useRefund()` exposing `refundEth/refundToken/refundNft/refundExcessEth/refundExcessToken`; exported from `lib/hooks/index.ts`.
+- `app/rounds/[roundId]/manage/page.tsx` → `ReclaimSection` component + "Reclaim Funds" card, gated on on-chain `chainState` (3=Completed / 4=Cancelled). Toggle for full-refund vs excess-only; ETH/token/NFT reclaim buttons. The contract enforces exact eligibility (errors surfaced in UI).
+
+**⚠️ CAVEAT:** Contracts are immutable and deployed per-round. This protects **future** rounds only (new deploys embed the rebuilt bytecode after `forge build`). Already-deployed empty rounds remain permanently locked.
+
+### Build / Test / Run
+
+```bash
+forge build          # recompile contracts — via_ir = SLOW (full ~3-5 min). Do NOT use --force.
+forge test -vv       # Solidity tests (8 passing)
+npx tsc --noEmit     # type-check — SLOW (~3 min, heavy viem ABI inference). Currently: exit 0, 0 errors.
+npm run dev          # Next.js (next dev --webpack). Cold route compiles are SLOW (minutes for heavy pages like /rounds/[id]/manage).
+```
+
+**Gotchas:**
+- `forge build`/`forge test` regenerate `out/*.json`, which `lib/contracts/abis.ts` imports. Don't run forge **while** the dev server is compiling — webpack can hit a transient `ENOENT` on the artifact and cache a failed build. Fix: restart `npm run dev`.
+- New contract functions flow to the frontend automatically: `forge build` → updated ABI + bytecode in `out/LilRound.sol/LilRound.json` → `abis.ts` → wizard deploy (`encodeDeployData`). No manual ABI copy.
+
+### Next steps (suggested)
+1. **Commit** this session's work (working tree is dirty, nothing committed yet).
+2. Deploy a test round on Base and exercise the full reclaim flow end-to-end (cancel→refund, over-fund→excess after window).
+3. Consider surfacing per-asset reclaimable amounts in the UI (read `ethDepositOf`/`tokenDepositOf`/`excess*` views) instead of relying on tx-revert for eligibility.
+4. Optional: a "Funding progress" bar comparing on-chain balance to award obligations.
+
+---
+
+## Previous Session (2026-06-23): Permanent On-Chain Voting Records
 
 **Goal**: Make all voting data permanently referenceable from the blockchain, even if the website disappears.
 

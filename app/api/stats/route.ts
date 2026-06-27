@@ -3,14 +3,23 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET() {
   try {
+    const now = new Date();
     const [houses, rounds, proposals, votes, fundingResult] = await Promise.all([
       prisma.house.count({ where: { visible: true } }),
       prisma.round.count({ where: { visible: true } }),
-      prisma.proposal.count({ where: { deletedAt: null } }),
-      prisma.vote.count(),
+      prisma.proposal.count({
+        where: { deletedAt: null, round: { state: { not: 'CANCELLED' } } },
+      }),
+      prisma.vote.count({
+        where: { proposal: { round: { state: { not: 'CANCELLED' } } } },
+      }),
       prisma.round.aggregate({
         _sum: { fundingAmount: true },
-        where: { visible: true, state: 'COMPLETED' },
+        where: {
+          visible: true,
+          state: { notIn: ['CANCELLED', 'NOT_STARTED'] },
+          OR: [{ state: 'COMPLETED' }, { votingEndTime: { lte: now } }],
+        },
       }),
     ]);
 

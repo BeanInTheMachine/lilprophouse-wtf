@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useHouse } from '@/lib/hooks/useApi';
 import RoundList from '@/components/RoundList';
+import { deriveRoundState } from '@/lib/roundState';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -35,9 +36,10 @@ export default function HousePage() {
   }
 
   const rounds = house.rounds ?? [];
-  const activeRounds = rounds.filter(
-    (r: any) => r.state === 'ACCEPTING_PROPOSALS' || r.state === 'VOTING',
-  );
+  const activeRounds = rounds.filter((r: any) => {
+    const s = deriveRoundState(r);
+    return s === 'ACCEPTING_PROPOSALS' || s === 'VOTING';
+  });
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -92,7 +94,7 @@ export default function HousePage() {
             id: r.id,
             title: r.title,
             type: r.type,
-            state: r.state,
+            state: deriveRoundState(r),
             fundingAmount: Number(r.fundingAmount),
             currencyType: r.currencyType,
             numWinners: r.numWinners,
