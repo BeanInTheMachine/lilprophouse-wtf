@@ -73,7 +73,7 @@ State derived from block.timestamp vs deadlines in `lib/roundState.ts` and `LilR
 
 ## This Session (2026-06-25): Round Listing Fix + Fund Refunds
 
-Two independent pieces of work. Both implemented, type-checked, and verified. **Not yet committed** (working tree changes only).
+Two independent pieces of work. Both implemented, type-checked, and verified. **Committed and pushed** to `origin/main` as commit `31e5936` (`feat: trustless fund refunds + time-derived round listings`).
 
 ### Part A — Listings/stats now reflect *time-derived* state; cancelled rounds hidden
 
@@ -130,7 +130,7 @@ npm run dev          # Next.js (next dev --webpack). Cold route compiles are SLO
 - New contract functions flow to the frontend automatically: `forge build` → updated ABI + bytecode in `out/LilRound.sol/LilRound.json` → `abis.ts` → wizard deploy (`encodeDeployData`). No manual ABI copy.
 
 ### Next steps (suggested)
-1. **Commit** this session's work (working tree is dirty, nothing committed yet).
+1. ✅ Committed + pushed to `origin/main` (`31e5936`).
 2. Deploy a test round on Base and exercise the full reclaim flow end-to-end (cancel→refund, over-fund→excess after window).
 3. Consider surfacing per-asset reclaimable amounts in the UI (read `ethDepositOf`/`tokenDepositOf`/`excess*` views) instead of relying on tx-revert for eligibility.
 4. Optional: a "Funding progress" bar comparing on-chain balance to award obligations.
